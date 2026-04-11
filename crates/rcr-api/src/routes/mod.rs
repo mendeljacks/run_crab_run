@@ -9,7 +9,7 @@ use axum::{
 };
 use tower_http::trace::TraceLayer;
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::sse;
 use crate::state::AppState;
@@ -29,12 +29,10 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api)
-        .nest_service("/static", ServeDir::new("static"))
-        .route("/", get(serve_index))
+        .fallback_service(
+            ServeDir::new("static")
+                .fallback(ServeFile::new("static/index.html"))
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
-}
-
-async fn serve_index() -> axum::response::Html<String> {
-    axum::response::Html(std::fs::read_to_string("static/index.html").unwrap_or_default())
 }

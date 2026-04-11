@@ -7,3 +7,13 @@ edition = "2021"
 leptos = { version = "0.7", features = ["csr"] }
 leptos_meta = { version = "0.7" }
 leptos_router = { version = "0.7" }
+rcr-core = { path = "../rcr-core" }
+gloo-net = "0.6"
+gloo-timers = { version = "0.3", features = ["futures"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["wasmbind"] }
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { workspace = true, features = ["js"] }
+web-sys = { version = "0.3", features = ["Window", "Location"] }

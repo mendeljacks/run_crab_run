@@ -1,7 +1,9 @@
 use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, Title};
-use leptos_router::components::{Router, Routes, Route};
+use leptos_router::components::{Route, Router, Routes};
 use leptos_router::StaticSegment;
+
+use crate::pages::{dashboard, jobs, create_job, runs, run_detail};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -13,49 +15,21 @@ pub fn App() -> impl IntoView {
             <nav class="navbar">
                 <a href="/" class="nav-brand">"🦀 Run Crab Run"</a>
                 <div class="nav-links">
-                    <a href="/jobs">"Jobs"</a>
-                    <a href="/runs">"Runs"</a>
+                    <a href="/" class="nav-link">"Dashboard"</a>
+                    <a href="/jobs" class="nav-link">"Jobs"</a>
+                    <a href="/runs" class="nav-link">"Runs"</a>
                 </div>
             </nav>
             <main class="container">
                 <Routes fallback=|| view! { <NotFound /> }>
-                    <Route path=StaticSegment("") view=HomePage />
-                    <Route path=StaticSegment("jobs") view=JobsPage />
-                    <Route path=StaticSegment("runs") view=RunsPage />
+                    <Route path=StaticSegment("") view=dashboard::DashboardPage />
+                    <Route path=StaticSegment("jobs") view=jobs::JobsPage />
+                    <Route path=(StaticSegment("jobs"), StaticSegment("new")) view=create_job::CreateJobPage />
+                    <Route path=StaticSegment("runs") view=runs::RunsPage />
+                    <Route path=(StaticSegment("runs"), StaticSegment("")) view=run_detail::RunDetailPage />
                 </Routes>
             </main>
         </Router>
-    }
-}
-
-#[component]
-fn HomePage() -> impl IntoView {
-    view! {
-        <div class="dashboard">
-            <h1>"🦀 Run Crab Run"</h1>
-            <p>"Job runner dashboard"</p>
-            <p>"Use the API or the Jobs/Runs pages to manage your jobs."</p>
-        </div>
-    }
-}
-
-#[component]
-fn JobsPage() -> impl IntoView {
-    view! {
-        <div class="page">
-            <h1>"Jobs"</h1>
-            <p>"Job management — use the API to create and manage jobs."</p>
-        </div>
-    }
-}
-
-#[component]
-fn RunsPage() -> impl IntoView {
-    view! {
-        <div class="page">
-            <h1>"Runs"</h1>
-            <p>"Run history — use the API to view runs."</p>
-        </div>
     }
 }
 
@@ -65,7 +39,7 @@ fn NotFound() -> impl IntoView {
         <div class="not-found">
             <h1>"404"</h1>
             <p>"Page not found"</p>
-            <a href="/">"Go home"</a>
+            <a href="/" class="btn btn-primary">"Go home"</a>
         </div>
     }
 }
