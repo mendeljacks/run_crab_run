@@ -163,6 +163,7 @@ body {
 
 .btn:hover { opacity: 0.9; }
 .btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-dark); }
@@ -232,6 +233,8 @@ body {
     display: flex;
     gap: 0.4rem;
     margin-top: 0.75rem;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 /* ─── Tables ────────────────────────────────────────────────── */
@@ -270,12 +273,149 @@ body {
 .data-table .clickable { cursor: pointer; }
 .data-table .clickable:hover { background: var(--primary-light); }
 
-code {
+.action-cell {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+/* ─── Job Link ─────────────────────────────────────────────── */
+.job-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.job-link:hover {
+    text-decoration: underline;
+}
+
+/* ─── Command Preview ──────────────────────────────────────── */
+.command-preview {
     font-family: var(--mono);
+    font-size: 0.82rem;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 2.5rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ─── Checkbox Label ─────────────────────────────────────────── */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+/* ─── Webhook Section ───────────────────────────────────────── */
+.webhook-section {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.webhook-field {
+    display: contents;
+}
+
+.webhook-field label {
     font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+    padding: 0.25rem 0;
+}
+
+.webhook-field code, .webhook-field span {
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+.webhook-url {
+    font-family: var(--mono);
+    font-size: 0.82rem;
     background: var(--neutral-bg);
-    padding: 0.15rem 0.35rem;
-    border-radius: 3px;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.webhook-steps {
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+}
+
+.webhook-steps h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.webhook-steps ol {
+    padding-left: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.webhook-steps ol li {
+    margin-bottom: 0.35rem;
+    line-height: 1.5;
+}
+
+/* ─── Filters Bar ──────────────────────────────────────────── */
+.filters-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-input {
+    max-width: 200px;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+/* ─── Pagination ────────────────────────────────────────────── */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0.75rem 0;
+}
+
+.page-info {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+/* ─── Results Info ───────────────────────────────────────────── */
+.results-info {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
 }
 
 /* ─── Detail Grid ───────────────────────────────────────────── */
@@ -480,4 +620,7 @@ code {
     .detail-grid { grid-template-columns: 1fr 1fr; }
     .navbar { padding: 0.5rem 1rem; }
     .container, .view { padding: 1rem; }
+    .filters-bar { flex-direction: column; }
+    .filter-input { max-width: 100%; }
+    .webhook-section { grid-template-columns: 1fr; }
 }

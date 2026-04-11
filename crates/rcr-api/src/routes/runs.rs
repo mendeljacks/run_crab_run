@@ -1,6 +1,6 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use rcr_core::models::run::{Run, RunSummary, RunsFilter};
+use rcr_core::models::run::{Run, RunsFilter, RunsResponse};
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -8,9 +8,9 @@ use crate::state::AppState;
 pub async fn list_runs(
     State(state): State<AppState>,
     Query(filter): Query<RunsFilter>,
-) -> Result<Json<Vec<RunSummary>>, ApiError> {
-    let runs = state.db.list_runs(filter).await?;
-    Ok(Json(runs))
+) -> Result<Json<RunsResponse>, ApiError> {
+    let response = state.db.list_runs(filter).await?;
+    Ok(Json(response))
 }
 
 pub async fn get_run(

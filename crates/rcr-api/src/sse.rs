@@ -1,6 +1,6 @@
 use axum::response::sse::{Event, Sse};
 use futures::stream::Stream;
-use rcr_core::models::run::RunsFilter;
+use rcr_core::models::run::{RunStatus, RunsFilter};
 use std::convert::Infallible;
 use tokio::time::Duration;
 use crate::state::AppState;
@@ -17,12 +17,15 @@ pub async fn run_events(
 
             match db.list_runs(RunsFilter {
                 job_id: None,
-                status: None,
+                status: Some(RunStatus::Running),
+                search: None,
+                sort_by: Some("started_at".to_string()),
+                sort_order: Some("desc".to_string()),
                 limit: Some(50),
                 offset: None,
             }).await {
-                Ok(runs) => {
-                    let data = serde_json::to_string(&runs).unwrap_or_else(|_| "[]".to_string());
+                Ok(response) => {
+                    let data = serde_json::to_string(&response.runs).unwrap_or_else(|_| "[]".to_string());
                     yield Ok(Event::default().event("runs").data(data));
                 }
                 Err(_) => {

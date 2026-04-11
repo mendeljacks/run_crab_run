@@ -42,6 +42,10 @@ impl Database {
             .execute(&self.pool)
             .await
             .map_err(|e| Error::Database(e.to_string()))?;
+        sqlx::query(migrations::MIGRATION_004)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())
     }
 

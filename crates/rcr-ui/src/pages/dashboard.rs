@@ -1,7 +1,8 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use rcr_core::models::{Job, RunStatus};
-use rcr_core::models::run::RunSummary;
+use rcr_core::models::Job;
+use rcr_core::models::run::RunStatus;
+use rcr_core::models::run::RunsFilter;
 
 use crate::api;
 use crate::util::*;
@@ -9,7 +10,7 @@ use crate::util::*;
 #[component]
 pub fn DashboardPage() -> impl IntoView {
     let (jobs, set_jobs) = signal(Vec::<Job>::new());
-    let (runs, set_runs) = signal(Vec::<RunSummary>::new());
+    let (runs_data, set_runs_data) = signal(None::<(Vec<rcr_core::models::run::RunSummary>, i64)>);
     let (loading, set_loading) = signal(true);
     let (error, set_error) = signal(None::<String>);
     let (delete_id, set_delete_id) = signal(None::<String>);
@@ -20,8 +21,17 @@ pub fn DashboardPage() -> impl IntoView {
             Ok(j) => set_jobs.set(j),
             Err(e) => set_error.set(Some(e)),
         }
-        match api::fetch_runs(20).await {
-            Ok(r) => set_runs.set(r),
+        let filter = RunsFilter {
+            job_id: None,
+            status: None,
+            search: None,
+            sort_by: Some("started_at".to_string()),
+            sort_order: Some("desc".to_string()),
+            limit: Some(20),
+            offset: Some(0),
+        };
+        match api::fetch_runs(&filter).await {
+            Ok(resp) => set_runs_data.set(Some((resp.runs, resp.total))),
             Err(e) => set_error.set(Some(e)),
         }
         set_loading.set(false);
@@ -51,19 +61,19 @@ pub fn DashboardPage() -> impl IntoView {
                             </div>
                             <div class="stat-card">
                                 <div class="stat-num stat-primary">
-                                    {move || runs.get().iter().filter(|r| r.status == RunStatus::Running).count()}
+                                    {move || runs_data.get().map(|(runs, _)| runs.iter().filter(|r| r.status == RunStatus::Running).count()).unwrap_or(0)}
                                 </div>
                                 <div class="stat-label">"Running"</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-num stat-success">
-                                    {move || runs.get().iter().filter(|r| r.status == RunStatus::Success).count()}
+                                    {move || runs_data.get().map(|(runs, _)| runs.iter().filter(|r| r.status == RunStatus::Success).count()).unwrap_or(0)}
                                 </div>
                                 <div class="stat-label">"Success"</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-num stat-danger">
-                                    {move || runs.get().iter().filter(|r| r.status == RunStatus::Failed).count()}
+                                    {move || runs_data.get().map(|(runs, _)| runs.iter().filter(|r| r.status == RunStatus::Failed).count()).unwrap_or(0)}
                                 </div>
                                 <div class="stat-label">"Failed"</div>
                             </div>
@@ -82,20 +92,23 @@ pub fn DashboardPage() -> impl IntoView {
                                             let schedule = job.schedule.clone().map(|s| format!("📅 {}", s)).unwrap_or_else(|| "⚡ Manual / Webhook".to_string());
                                             let id_trigger = job.id.clone();
                                             let id_delete = job.id.clone();
-                                            let _id_href = format!("/api/jobs/{}/trigger", job.id);
+                                            let id_edit = job.id.clone();
+                                            let id_runs = job.id.clone();
 
                                             view! {
                                                 <div class="card">
                                                     <div class="job-card-head">
-                                                        <strong>{job.name.clone()}</strong>
+                                                        <a href={format!("/runs?job_id={}", id_runs)} class="job-link">
+                                                            <strong>{job.name.clone()}</strong>
+                                                        </a>
                                                         <span class=badge_class>{badge_text}</span>
                                                     </div>
                                                     <div class="mono">{job.command.clone()}</div>
                                                     <div class="meta">{schedule}</div>
-                                                    <div class="tag-row">
-                                                        {job.tags.iter().map(|tag| view! {
-                                                            <span class="badge badge-neutral">{tag.clone()}</span>
-                                                        }).collect::<Vec<_>>()}
+                                                    <div class="meta">
+                                                        {if job.containerized { "🐳 Containerized" } else { "" }}
+                                                        " "
+                                                        {if job.notify { "📧 Notify" } else { "" }}
                                                     </div>
                                                     <div class="card-actions">
                                                         <button class="btn btn-primary btn-sm" on:click=move |_| {
@@ -103,11 +116,23 @@ pub fn DashboardPage() -> impl IntoView {
                                                             spawn_local(async move {
                                                                 if let Err(e) = api::trigger_job(&id).await {
                                                                     set_error.set(Some(e));
-                                                                } else if let Ok(r) = api::fetch_runs(20).await {
-                                                                    set_runs.set(r);
+                                                                } else {
+                                                                    let filter = RunsFilter {
+                                                                        job_id: None,
+                                                                        status: None,
+                                                                        search: None,
+                                                                        sort_by: Some("started_at".to_string()),
+                                                                        sort_order: Some("desc".to_string()),
+                                                                        limit: Some(20),
+                                                                        offset: Some(0),
+                                                                    };
+                                                                    if let Ok(resp) = api::fetch_runs(&filter).await {
+                                                                        set_runs_data.set(Some((resp.runs, resp.total)));
+                                                                    }
                                                                 }
                                                             });
                                                         }>"▶ Run"</button>
+                                                        <a href={format!("/jobs/{}/edit", id_edit)} class="btn btn-default btn-sm">"✎ Edit"</a>
                                                         <button class="btn btn-danger btn-sm" on:click=move |_| {
                                                             set_delete_id.set(Some(id_delete.clone()));
                                                         }>"✕ Delete"</button>
@@ -122,36 +147,38 @@ pub fn DashboardPage() -> impl IntoView {
 
                         <h2 style="margin-top:2rem">"Recent Runs"</h2>
                         {move || {
-                            let r = runs.get();
-                            if r.is_empty() {
-                                view! { <div class="alert alert-neutral">"No runs yet."</div> }.into_any()
+                            if let Some((runs, _)) = runs_data.get() {
+                                if runs.is_empty() {
+                                    view! { <div class="alert alert-neutral">"No runs yet."</div> }.into_any()
+                                } else {
+                                    view! {
+                                        <div class="table-wrap">
+                                            <table class="data-table">
+                                                <thead><tr><th>"ID"</th><th>"Job"</th><th>"Status"</th><th>"Trigger"</th><th>"Duration"</th><th>"Started"</th></tr></thead>
+                                                <tbody>
+                                                    {runs.into_iter().map(|run| {
+                                                        let (sc, st) = status_badge(&run.status);
+                                                        let rid = run.id.clone();
+                                                        view! {
+                                                            <tr class="clickable" on:click=move |_| {
+                                                                let _ = web_sys::window().unwrap().location().set_href(&format!("/runs/{}", rid));
+                                                            }>
+                                                                <td><code>{short_id(&run.id)}</code></td>
+                                                                <td>{run.job_name.clone()}</td>
+                                                                <td><span class=sc>{st}</span></td>
+                                                                <td>{format_trigger(&run.trigger)}</td>
+                                                                <td>{format_duration(run.duration_ms)}</td>
+                                                                <td>{format_time_ago(&run.started_at)}</td>
+                                                            </tr>
+                                                        }
+                                                    }).collect::<Vec<_>>()}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }.into_any()
+                                }
                             } else {
-                                view! {
-                                    <div class="table-wrap">
-                                        <table class="data-table">
-                                            <thead><tr><th>"ID"</th><th>"Job"</th><th>"Status"</th><th>"Trigger"</th><th>"Duration"</th><th>"Started"</th></tr></thead>
-                                            <tbody>
-                                                {r.into_iter().map(|run| {
-                                                    let (sc, st) = status_badge(&run.status);
-                                                    let rid = run.id.clone();
-                                                    let _href = format!("/runs/{}", run.id);
-                                                    view! {
-                                                        <tr class="clickable" on:click=move |_| {
-                                                            let _ = web_sys::window().unwrap().location().set_href(&format!("/runs/{}", rid));
-                                                        }>
-                                                            <td><code>{short_id(&run.id)}</code></td>
-                                                            <td>{run.job_name.clone()}</td>
-                                                            <td><span class=sc>{st}</span></td>
-                                                            <td>{format_trigger(&run.trigger)}</td>
-                                                            <td>{format_duration(run.duration_ms)}</td>
-                                                            <td>{format_time_ago(&run.started_at)}</td>
-                                                        </tr>
-                                                    }
-                                                }).collect::<Vec<_>>()}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                }.into_any()
+                                view! { <div class="alert alert-neutral">"No runs yet."</div> }.into_any()
                             }
                         }}
                     </>

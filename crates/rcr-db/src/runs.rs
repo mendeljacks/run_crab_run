@@ -1,5 +1,5 @@
 use crate::Database;
-use rcr_core::models::run::{CreateRun, Run, RunStatus, RunsFilter, RunSummary};
+use rcr_core::models::run::{CreateRun, Run, RunStatus, RunsFilter, RunsResponse, RunSummary};
 use rcr_core::models::trigger::Trigger;
 use rcr_core::Error;
 
@@ -90,48 +90,92 @@ impl Database {
         row.into_model()
     }
 
-    pub async fn list_runs(&self, filter: RunsFilter) -> Result<Vec<RunSummary>, Error> {
-        let mut query_str = String::from(
-            "SELECT r.id, r.job_id, j.name as job_name, r.trigger, r.status, r.exit_code, r.duration_ms, r.cpu_pct, r.mem_kb, r.started_at, r.finished_at FROM runs r JOIN jobs j ON r.job_id = j.id WHERE 1=1"
-        );
+    pub async fn list_runs(&self, filter: RunsFilter) -> Result<RunsResponse, Error> {
+        let mut where_clauses = vec!["1=1".to_string()];
+        let mut count_where = vec!["1=1".to_string()];
 
         if filter.job_id.is_some() {
-            query_str.push_str(" AND r.job_id = ?");
+            where_clauses.push("r.job_id = ?".to_string());
+            count_where.push("r.job_id = ?".to_string());
         }
         if filter.status.is_some() {
-            query_str.push_str(" AND r.status = ?");
+            where_clauses.push("r.status = ?".to_string());
+            count_where.push("r.status = ?".to_string());
+        }
+        if filter.search.is_some() {
+            where_clauses.push("(j.name LIKE ? OR r.id LIKE ?)".to_string());
+            count_where.push("(j.name LIKE ? OR r.id LIKE ?)".to_string());
         }
 
-        query_str.push_str(" ORDER BY r.started_at DESC");
+        let where_str = where_clauses.join(" AND ");
+        let count_where_str = count_where.join(" AND ");
 
-        if filter.limit.is_some() {
-            query_str.push_str(" LIMIT ?");
+        // Determine ORDER BY
+        let sort_by = filter.sort_by.as_deref().unwrap_or("started_at");
+        let sort_col = match sort_by {
+            "duration" | "duration_ms" => "r.duration_ms",
+            "status" => "r.status",
+            "job" | "job_name" => "j.name",
+            _ => "r.started_at",
+        };
+        let sort_dir = if filter.sort_order.as_deref() == Some("asc") { "ASC" } else { "DESC" };
+
+        // Count query
+        let count_sql = format!(
+            "SELECT COUNT(*) as count FROM runs r JOIN jobs j ON r.job_id = j.id WHERE {}",
+            count_where_str
+        );
+
+        let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
+        if let Some(ref job_id) = filter.job_id {
+            count_q = count_q.bind(job_id);
         }
-        if filter.offset.is_some() {
-            query_str.push_str(" OFFSET ?");
+        if let Some(ref status) = filter.status {
+            count_q = count_q.bind(status.to_string());
+        }
+        if let Some(ref search) = filter.search {
+            count_q = count_q.bind(format!("%{}%", search));
+            count_q = count_q.bind(format!("%{}%", search));
         }
 
-        let mut q = sqlx::query_as::<_, RunSummaryRow>(&query_str);
+        let total = count_q
+            .fetch_one(self.pool())
+            .await
+            .map_err(|e| Error::Database(e.to_string()))?;
 
+        // Data query
+        let data_sql = format!(
+            "SELECT r.id, r.job_id, j.name as job_name, r.trigger, r.status, r.exit_code, r.duration_ms, r.cpu_pct, r.mem_kb, r.started_at, r.finished_at FROM runs r JOIN jobs j ON r.job_id = j.id WHERE {} ORDER BY {} {}",
+            where_str, sort_col, sort_dir
+        );
+
+        let limit = filter.limit.unwrap_or(50);
+        let offset = filter.offset.unwrap_or(0);
+
+        let data_sql = format!("{} LIMIT ? OFFSET ?", data_sql);
+
+        let mut q = sqlx::query_as::<_, RunSummaryRow>(&data_sql);
         if let Some(ref job_id) = filter.job_id {
             q = q.bind(job_id);
         }
         if let Some(ref status) = filter.status {
             q = q.bind(status.to_string());
         }
-        if let Some(limit) = filter.limit {
-            q = q.bind(limit);
+        if let Some(ref search) = filter.search {
+            q = q.bind(format!("%{}%", search));
+            q = q.bind(format!("%{}%", search));
         }
-        if let Some(offset) = filter.offset {
-            q = q.bind(offset);
-        }
+        q = q.bind(limit);
+        q = q.bind(offset);
 
         let rows = q
             .fetch_all(self.pool())
             .await
             .map_err(|e| Error::Database(e.to_string()))?;
 
-        rows.into_iter().map(|r| r.into_model()).collect()
+        let runs = rows.into_iter().map(|r| r.into_model()).collect::<Result<Vec<_>, _>>()?;
+
+        Ok(RunsResponse { runs, total })
     }
 
     pub async fn delete_run(&self, id: &str) -> Result<(), Error> {

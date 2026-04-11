@@ -14,12 +14,3 @@ pub trait Notifier: Send + Sync {
         to: &str,
     ) -> Result<(), String>;
 }
-
-/// Should we send a notification for this run status + policy?
-pub fn should_notify(policy: &str, status: RunStatus) -> bool {
-    match policy {
-        "always" => true,
-        "failure" => matches!(status, RunStatus::Failed | RunStatus::Timeout),
-        _ => false,
-    }
-}

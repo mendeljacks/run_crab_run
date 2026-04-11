@@ -68,6 +68,15 @@ pub struct RunSummary {
 pub struct RunsFilter {
     pub job_id: Option<String>,
     pub status: Option<RunStatus>,
+    pub search: Option<String>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunsResponse {
+    pub runs: Vec<RunSummary>,
+    pub total: i64,
 }

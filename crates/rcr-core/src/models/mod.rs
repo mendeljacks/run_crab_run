@@ -5,7 +5,7 @@ pub mod config;
 pub mod trigger;
 
 pub use job::Job;
-pub use run::{Run, RunStatus};
+pub use run::{Run, RunStatus, RunsResponse};
 pub use webhook::WebhookSubscription;
 pub use config::AppConfig;
 pub use trigger::Trigger;

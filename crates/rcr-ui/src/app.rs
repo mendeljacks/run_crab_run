@@ -2,8 +2,9 @@ use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, Title};
 use leptos_router::components::{Route, Router, Routes};
 use leptos_router::StaticSegment;
+use leptos_router::ParamSegment;
 
-use crate::pages::{dashboard, jobs, create_job, runs, run_detail};
+use crate::pages::{dashboard, jobs, create_job, edit_job, runs, run_detail};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -25,8 +26,9 @@ pub fn App() -> impl IntoView {
                     <Route path=StaticSegment("") view=dashboard::DashboardPage />
                     <Route path=StaticSegment("jobs") view=jobs::JobsPage />
                     <Route path=(StaticSegment("jobs"), StaticSegment("new")) view=create_job::CreateJobPage />
+                    <Route path=(StaticSegment("jobs"), ParamSegment("id"), StaticSegment("edit")) view=edit_job::EditJobPage />
                     <Route path=StaticSegment("runs") view=runs::RunsPage />
-                    <Route path=(StaticSegment("runs"), StaticSegment("")) view=run_detail::RunDetailPage />
+                    <Route path=(StaticSegment("runs"), ParamSegment("id")) view=run_detail::RunDetailPage />
                 </Routes>
             </main>
         </Router>

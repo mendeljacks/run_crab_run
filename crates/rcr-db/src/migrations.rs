@@ -52,3 +52,9 @@ CREATE TABLE IF NOT EXISTS webhook_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_webhooks_job_id ON webhook_subscriptions(job_id);
 "#;
+
+pub const MIGRATION_004: &str = r#"
+ALTER TABLE jobs ADD COLUMN containerized BOOLEAN NOT NULL DEFAULT 0;
+ALTER TABLE jobs ADD COLUMN container_image TEXT;
+ALTER TABLE jobs ADD COLUMN notify BOOLEAN NOT NULL DEFAULT 0;
+"#;

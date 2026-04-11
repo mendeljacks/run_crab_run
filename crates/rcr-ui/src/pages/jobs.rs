@@ -45,7 +45,8 @@ pub fn JobsPage() -> impl IntoView {
                                         <th>"Command"</th>
                                         <th>"Schedule"</th>
                                         <th>"Status"</th>
-                                        <th>"Tags"</th>
+                                        <th>"Container"</th>
+                                        <th>"Notify"</th>
                                         <th>"Actions"</th>
                                     </tr>
                                 </thead>
@@ -54,31 +55,48 @@ pub fn JobsPage() -> impl IntoView {
                                         let (badge_class, badge_text) = enabled_badge(job.enabled);
                                         let id_trigger = job.id.clone();
                                         let id_delete = job.id.clone();
+                                        let id_edit = job.id.clone();
+                                        let id_runs = job.id.clone();
                                         let schedule = job.schedule.clone().unwrap_or_else(|| "—".to_string());
 
                                         view! {
                                             <tr>
-                                                <td><strong>{job.name.clone()}</strong></td>
+                                                <td>
+                                                    <a href={format!("/runs?job_id={}", id_runs)} class="job-link">
+                                                        <strong>{job.name.clone()}</strong>
+                                                    </a>
+                                                </td>
                                                 <td><code>{job.command.clone()}</code></td>
                                                 <td>{schedule}</td>
                                                 <td><span class=badge_class>{badge_text}</span></td>
                                                 <td>
-                                                    {job.tags.iter().map(|tag| view! {
-                                                        <span class="badge badge-neutral">{tag.clone()}</span>
-                                                    }).collect::<Vec<_>>()}
+                                                    {if job.containerized {
+                                                        "🐳 Yes".to_string()
+                                                    } else {
+                                                        "—".to_string()
+                                                    }}
                                                 </td>
                                                 <td>
+                                                    {if job.notify {
+                                                        format!("📧 {}", job.notify_email.as_deref().unwrap_or("—"))
+                                                    } else {
+                                                        "—".to_string()
+                                                    }}
+                                                </td>
+                                                <td class="action-cell">
                                                     <button class="btn btn-primary btn-sm" on:click=move |_| {
                                                         let id = id_trigger.clone();
+                                                        set_error.set(None);
                                                         spawn_local(async move {
                                                             if let Err(e) = api::trigger_job(&id).await {
                                                                 set_error.set(Some(e));
                                                             }
                                                         });
                                                     }>"▶ Run"</button>
+                                                    <a href={format!("/jobs/{}/edit", id_edit)} class="btn btn-default btn-sm">"✎ Edit"</a>
                                                     <button class="btn btn-danger btn-sm" on:click=move |_| {
                                                         set_delete_id.set(Some(id_delete.clone()));
-                                                    }>"✕"</button>
+                                                    }>"✕ Delete"</button>
                                                 </td>
                                             </tr>
                                         }

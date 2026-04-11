@@ -33,6 +33,7 @@ pub fn RunDetailPage() -> impl IntoView {
                 view! { <div class="alert alert-danger">{e}</div> }.into_any()
             } else if let Some(r) = run.get() {
                 let (status_class, status_text) = status_badge(&r.status);
+                let job_id_link = r.job_id.clone();
                 view! {
                     <>
                         <div class="view-header">
@@ -43,7 +44,9 @@ pub fn RunDetailPage() -> impl IntoView {
                         <div class="detail-grid">
                             <div class="detail-fact">
                                 <div class="detail-label">"Job"</div>
-                                <div class="detail-value">{r.job_id.clone()}</div>
+                                <div class="detail-value">
+                                    <a href={format!("/runs?job_id={}", job_id_link)} class="job-link">{r.job_id.clone()}</a>
+                                </div>
                             </div>
                             <div class="detail-fact">
                                 <div class="detail-label">"Trigger"</div>

@@ -1,4 +1,4 @@
-use rcr_core::notify::{should_notify, Notifier};
+use rcr_core::notify::Notifier;
 use rcr_core::models::job::Job;
 use rcr_core::models::run::RunStatus;
 use rcr_core::models::trigger::Trigger;
@@ -58,7 +58,7 @@ impl JobExecutor {
             Ok(format!("pending:{}", job_id))
         } else {
             // Start immediately
-            let run_id = self.spawn_run(job.id.clone(), trigger, webhook_args.clone()).await?;
+            let run_id = self.spawn_run(job.id.clone(), trigger, webhook_args.clone(), job.clone()).await?;
             states.insert(job_id, JobRunState { pending: None });
             Ok(run_id)
         }
@@ -69,6 +69,7 @@ impl JobExecutor {
         job_id: String,
         trigger: Trigger,
         webhook_args: Option<serde_json::Value>,
+        job: Job,
     ) -> Result<String, Error> {
         let create = rcr_core::models::run::CreateRun {
             job_id: job_id.clone(),
@@ -82,8 +83,6 @@ impl JobExecutor {
 
         info!(job_id = %job_id, run_id = %run_id, "Starting job execution");
 
-        let job = self.db.get_job(&job_id).await?;
-
         let db = self.db.clone();
         let notifier = self.notifier.clone();
         let run_states = self.run_states.clone();
@@ -93,8 +92,10 @@ impl JobExecutor {
             let result = execute_command(
                 &job.command,
                 &job.env_vars,
-                job.timeout_secs.map(|s| Duration::from_secs(s as u64)),
+                None, // no timeout (removed feature)
                 webhook_args.clone(),
+                job.containerized,
+                job.container_image.as_deref(),
             ).await;
 
             let (status, exit_code, stdout, stderr, error_message, cpu_pct, mem_kb, duration_ms) = match result {
@@ -105,10 +106,7 @@ impl JobExecutor {
                 }
                 Err(e) => {
                     error!(job_id = %job_id, run_id = %run_id, error = %e, "Job execution failed");
-                    let status = match &e {
-                        ExecutionError::Timeout => RunStatus::Timeout,
-                        _ => RunStatus::Failed,
-                    };
+                    let status = RunStatus::Failed;
                     (status, None, None, None, Some(e.to_string()), None, None, None)
                 }
             };
@@ -118,14 +116,12 @@ impl JobExecutor {
             }
 
             // Notification
-            if let Some(ref policy) = job.notify_on {
-                if should_notify(policy, status) {
-                    if let Some(ref email) = job.notify_email {
-                        let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                        let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                        if let Err(e) = notifier.notify(&job.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
-                            warn!(error = %e, "Failed to send notification");
-                        }
+            if job.notify {
+                if let Some(ref email) = job.notify_email {
+                    let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
+                    let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
+                    if let Err(e) = notifier.notify(&job.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
+                        warn!(error = %e, "Failed to send notification");
                     }
                 }
             }
@@ -137,97 +133,68 @@ impl JobExecutor {
                     drop(states);
 
                     info!(job_id = %executor_self_job_id, "Executing coalesced pending run");
-                    // We need to re-trigger through the executor pattern.
-                    // Since we can't hold a reference to self in the spawned task,
-                    // we directly run the job again.
-                    let db = db.clone();
-                    let job_id = executor_self_job_id.clone();
+                    let db2 = db.clone();
+                    let job_id2 = executor_self_job_id.clone();
                     let run_states2 = run_states.clone();
                     let notifier2 = notifier.clone();
+                    let job2 = job.clone();
 
                     tokio::spawn(async move {
-                        // Look up job again (it might have been updated)
-                        let job = match db.get_job(&job_id).await {
-                            Ok(j) => j,
-                            Err(e) => {
-                                error!(error = %e, "Failed to fetch job for pending run");
-                                let mut s = run_states2.lock().await;
-                                s.remove(&job_id);
-                                return;
-                            }
-                        };
-
                         let create = rcr_core::models::run::CreateRun {
-                            job_id: job_id.clone(),
+                            job_id: job_id2.clone(),
                             trigger: pending.trigger,
                             webhook_args: pending.webhook_args,
                         };
 
-                        let run = match db.create_run(create).await {
+                        let run = match db2.create_run(create).await {
                             Ok(r) => r,
                             Err(e) => {
                                 error!(error = %e, "Failed to create pending run record");
                                 let mut s = run_states2.lock().await;
-                                s.remove(&job_id);
+                                s.remove(&job_id2);
                                 return;
                             }
                         };
                         let run_id = run.id;
 
                         let result = execute_command(
-                            &job.command,
-                            &job.env_vars,
-                            job.timeout_secs.map(|s| Duration::from_secs(s as u64)),
+                            &job2.command,
+                            &job2.env_vars,
+                            None,
                             run.webhook_args.clone(),
+                            job2.containerized,
+                            job2.container_image.as_deref(),
                         ).await;
 
                         let (status, exit_code, stdout, stderr, error_message, cpu_pct, mem_kb, duration_ms) = match result {
                             Ok(out) => {
                                 let status = if out.exit_code == 0 { RunStatus::Success } else { RunStatus::Failed };
-                                info!(job_id = %job_id, run_id = %run_id, "Pending run completed");
+                                info!(job_id = %job_id2, run_id = %run_id, "Pending run completed");
                                 (status, Some(out.exit_code), Some(out.stdout), Some(out.stderr), None, out.cpu_peak, out.mem_peak_kb, Some(out.duration_ms))
                             }
                             Err(e) => {
-                                error!(job_id = %job_id, run_id = %run_id, error = %e, "Pending run execution failed");
-                                let status = match &e {
-                                    ExecutionError::Timeout => RunStatus::Timeout,
-                                    _ => RunStatus::Failed,
-                                };
-                                (status, None, None, None, Some(e.to_string()), None, None, None)
+                                error!(job_id = %job_id2, run_id = %run_id, error = %e, "Pending run execution failed");
+                                (RunStatus::Failed, None, None, None, Some(e.to_string()), None, None, None)
                             }
                         };
 
-                        if let Err(e) = db.update_run_completed(&run_id, status, exit_code.clone(), stdout.clone(), stderr.clone(), error_message, cpu_pct, mem_kb, duration_ms).await {
+                        if let Err(e) = db2.update_run_completed(&run_id, status, exit_code.clone(), stdout.clone(), stderr.clone(), error_message, cpu_pct, mem_kb, duration_ms).await {
                             error!(run_id = %run_id, error = %e, "Failed to update pending run record");
                         }
 
                         // Notification for pending run
-                        if let Some(ref policy) = job.notify_on {
-                            if should_notify(policy, status) {
-                                if let Some(ref email) = job.notify_email {
-                                    let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                                    let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                                    if let Err(e) = notifier2.notify(&job.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
-                                        warn!(error = %e, "Failed to send notification for pending run");
-                                    }
+                        if job2.notify {
+                            if let Some(ref email) = job2.notify_email {
+                                let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
+                                let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
+                                if let Err(e) = notifier2.notify(&job2.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
+                                    warn!(error = %e, "Failed to send notification for pending run");
                                 }
                             }
                         }
 
-                        // Check for ANOTHER pending run
                         let mut s = run_states2.lock().await;
-                        if let Some(state) = s.get_mut(&job_id) {
-                            if state.pending.is_some() {
-                                // Another trigger came in while we were running.
-                                // For simplicity, we don't recurse further here.
-                                // The next scheduler tick or manual trigger will handle it.
-                                // Leave the state in place.
-                            } else {
-                                s.remove(&job_id);
-                            }
-                        } else {
-                            // State was already removed (shouldn't happen)
-                        }
+                        s.remove(&job_id2);
                     });
                 } else {
                     // No pending run — remove the state entry, job is idle
@@ -251,8 +218,6 @@ struct CommandOutput {
 
 #[derive(Debug, thiserror::Error)]
 enum ExecutionError {
-    #[error("Command timed out")]
-    Timeout,
     #[error("Failed to start process: {0}")]
     StartFailed(String),
     #[error("Process error: {0}")]
@@ -262,8 +227,10 @@ enum ExecutionError {
 async fn execute_command(
     command: &str,
     env_vars: &serde_json::Value,
-    timeout: Option<Duration>,
+    _timeout: Option<Duration>,
     override_env: Option<serde_json::Value>,
+    containerized: bool,
+    container_image: Option<&str>,
 ) -> Result<CommandOutput, ExecutionError> {
     let start = std::time::Instant::now();
 
@@ -286,12 +253,31 @@ async fn execute_command(
         }
     }
 
-    let mut cmd = tokio::process::Command::new("sh");
-    cmd.arg("-c").arg(command);
+    let actual_command = if containerized {
+        let image = container_image.unwrap_or("alpine:latest");
+        let env_flags: String = env.iter()
+            .map(|(k, v)| format!("-e {}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(" ");
+        // Escape single quotes in the command for the bash -c wrapper
+        let escaped_command = command.replace('\'', "'\\''");
+        if env_flags.is_empty() {
+            format!("docker run --rm {} bash -c '{}'", image, escaped_command)
+        } else {
+            format!("docker run --rm {} {} bash -c '{}'", env_flags, image, escaped_command)
+        }
+    } else {
+        command.to_string()
+    };
 
-    // Set merged environment variables
-    for (k, v) in &env {
-        cmd.env(k, v);
+    let mut cmd = tokio::process::Command::new("bash");
+    cmd.arg("-c").arg(&actual_command);
+
+    // Set environment variables (only when NOT containerized; for containerized they're in docker -e flags)
+    if !containerized {
+        for (k, v) in &env {
+            cmd.env(k, v);
+        }
     }
 
     cmd.stdout(std::process::Stdio::piped())
@@ -309,26 +295,10 @@ async fn execute_command(
         monitor.sample_loop(Duration::from_millis(500)).await;
     });
 
-    let result = if let Some(timeout) = timeout {
-        match tokio::time::timeout(timeout, child.wait()).await {
-            Ok(Ok(status)) => status,
-            Ok(Err(e)) => {
-                let _ = child.kill().await;
-                monitor_handle.abort();
-                return Err(ExecutionError::Other(e.to_string()));
-            }
-            Err(_) => {
-                let _ = child.kill().await;
-                monitor_handle.abort();
-                return Err(ExecutionError::Timeout);
-            }
-        }
-    } else {
-        child
-            .wait()
-            .await
-            .map_err(|e| ExecutionError::Other(e.to_string()))?
-    };
+    let result = child
+        .wait()
+        .await
+        .map_err(|e| ExecutionError::Other(e.to_string()))?;
 
     let exit_code = result.code().unwrap_or(-1);
 
@@ -341,8 +311,6 @@ async fn execute_command(
     // Stop monitoring and get results
     monitor_handle.abort();
     let (cpu_peak, mem_peak_kb) = {
-        // Since we spawned the monitor in a separate task, we can't get its results directly.
-        // We'll sample once more here as a final reading.
         let mut final_monitor = ProcessMonitor::new(pid);
         final_monitor.sample();
         (final_monitor.peak_cpu(), final_monitor.peak_mem_kb())
