@@ -1,0 +1,18 @@
+[package]
+name = "rcr-runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rcr-core = { path = "../rcr-core" }
+rcr-db = { path = "../rcr-db" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+sysinfo = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+rrule = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+lettre = { workspace = true }
