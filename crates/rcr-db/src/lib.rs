@@ -30,22 +30,28 @@ impl Database {
     }
 
     pub async fn run_migrations(&self) -> Result<(), Error> {
+        // Ensure tracking table exists
         sqlx::query(migrations::MIGRATION_001)
             .execute(&self.pool)
             .await
             .map_err(|e| Error::Database(e.to_string()))?;
-        sqlx::query(migrations::MIGRATION_002)
+
+        // Mark migration 001 as applied (the IF NOT EXISTS makes it safe to re-run)
+        sqlx::query("INSERT OR IGNORE INTO _migrations (id) VALUES ('001')")
             .execute(&self.pool)
             .await
             .map_err(|e| Error::Database(e.to_string()))?;
-        sqlx::query(migrations::MIGRATION_003)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| Error::Database(e.to_string()))?;
-        sqlx::query(migrations::MIGRATION_004)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| Error::Database(e.to_string()))?;
+
+        // Future migrations go here:
+        // let applied: Vec<String> = sqlx::query_scalar::<_, String>(
+        //     "SELECT id FROM _migrations ORDER BY id"
+        // ).fetch_all(&self.pool).await.map_err(|e| Error::Database(e.to_string()))?;
+        //
+        // if !applied.iter().any(|a| a == "002") {
+        //     sqlx::query(migrations::MIGRATION_002) ...
+        //     sqlx::query("INSERT INTO _migrations (id) VALUES ('002')") ...
+        // }
+
         Ok(())
     }
 

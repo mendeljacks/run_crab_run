@@ -1,26 +1,29 @@
 pub const MIGRATION_001: &str = r#"
+CREATE TABLE IF NOT EXISTS _migrations (
+    id TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     command TEXT NOT NULL,
     schedule TEXT,
     enabled BOOLEAN NOT NULL DEFAULT 1,
-    timeout_secs INTEGER,
     max_concurrent INTEGER NOT NULL DEFAULT 1,
     env_vars TEXT NOT NULL DEFAULT '{}',
     webhook_secret TEXT,
-    tags TEXT NOT NULL DEFAULT '[]',
-    notify_on TEXT,
+    containerized BOOLEAN NOT NULL DEFAULT 0,
+    container_image TEXT,
+    notify BOOLEAN NOT NULL DEFAULT 0,
     notify_email TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
-"#;
 
-pub const MIGRATION_002: &str = r#"
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    command TEXT,
     trigger TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'running',
     exit_code INTEGER,
@@ -39,9 +42,7 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_job_id ON runs(job_id);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
-"#;
 
-pub const MIGRATION_003: &str = r#"
 CREATE TABLE IF NOT EXISTS webhook_subscriptions (
     id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -51,10 +52,4 @@ CREATE TABLE IF NOT EXISTS webhook_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhooks_job_id ON webhook_subscriptions(job_id);
-"#;
-
-pub const MIGRATION_004: &str = r#"
-ALTER TABLE jobs ADD COLUMN containerized BOOLEAN NOT NULL DEFAULT 0;
-ALTER TABLE jobs ADD COLUMN container_image TEXT;
-ALTER TABLE jobs ADD COLUMN notify BOOLEAN NOT NULL DEFAULT 0;
 "#;

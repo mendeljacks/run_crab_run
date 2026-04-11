@@ -72,7 +72,8 @@ impl JobExecutor {
         job: Job,
     ) -> Result<String, Error> {
         let create = rcr_core::models::run::CreateRun {
-            job_id: job_id.clone(),
+            job_id: job.id.clone(),
+            command: job.command.clone(),
             trigger: trigger.clone(),
             webhook_args: webhook_args.clone(),
         };
@@ -142,6 +143,7 @@ impl JobExecutor {
                     tokio::spawn(async move {
                         let create = rcr_core::models::run::CreateRun {
                             job_id: job_id2.clone(),
+                            command: job2.command.clone(),
                             trigger: pending.trigger,
                             webhook_args: pending.webhook_args,
                         };
@@ -284,7 +286,7 @@ async fn execute_command(
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
 
-    let mut child = cmd
+    let child = cmd
         .spawn()
         .map_err(|e| ExecutionError::StartFailed(e.to_string()))?;
 
@@ -295,18 +297,13 @@ async fn execute_command(
         monitor.sample_loop(Duration::from_millis(500)).await;
     });
 
-    let result = child
-        .wait()
-        .await
-        .map_err(|e| ExecutionError::Other(e.to_string()))?;
-
-    let exit_code = result.code().unwrap_or(-1);
-
-    // Collect output
+    // Wait and collect output in one call
     let output = child
         .wait_with_output()
         .await
         .map_err(|e| ExecutionError::Other(e.to_string()))?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
 
     // Stop monitoring and get results
     monitor_handle.abort();

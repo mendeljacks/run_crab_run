@@ -28,6 +28,8 @@ impl std::fmt::Display for RunStatus {
 pub struct Run {
     pub id: String,
     pub job_id: String,
+    pub job_name: Option<String>,
+    pub command: Option<String>,
     pub trigger: Trigger,
     pub status: RunStatus,
     pub exit_code: Option<i32>,
@@ -45,6 +47,7 @@ pub struct Run {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRun {
     pub job_id: String,
+    pub command: String,
     pub trigger: Trigger,
     pub webhook_args: Option<serde_json::Value>,
 }
@@ -54,6 +57,7 @@ pub struct RunSummary {
     pub id: String,
     pub job_id: String,
     pub job_name: String,
+    pub command: String,
     pub trigger: Trigger,
     pub status: RunStatus,
     pub exit_code: Option<i32>,

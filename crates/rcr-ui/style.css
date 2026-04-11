@@ -139,7 +139,12 @@ body {
 
 .badge-success { background: var(--success-light); color: #065f46; }
 .badge-danger { background: var(--danger-light); color: #991b1b; }
-.badge-primary { background: var(--primary-light); color: #3730a3; }
+.badge-primary { background: var(--primary-light); color: #3730a3; animation: pulse-badge 2s ease-in-out infinite; }
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
 .badge-warning { background: var(--warning-light); color: #92400e; }
 .badge-neutral { background: var(--neutral-bg); color: var(--neutral-text); }
 
@@ -536,6 +541,17 @@ body {
 .alert-danger { background: var(--danger-light); color: #991b1b; }
 .alert-warning { background: var(--warning-light); color: #92400e; }
 .alert-neutral { background: var(--neutral-bg); color: var(--neutral-text); }
+.alert-info { background: #dbeafe; color: #1e40af; }
+
+.command-display {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    word-break: break-all;
+}
 
 /* ─── Modal ─────────────────────────────────────────────────── */
 .modal-overlay {

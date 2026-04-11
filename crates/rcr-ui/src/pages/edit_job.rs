@@ -1,18 +1,14 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use leptos_router::hooks::use_params_map;
 use rcr_core::models::job::UpdateJob;
 
 use crate::api;
 
 #[component]
 pub fn EditJobPage() -> impl IntoView {
-    let path = web_sys::window().unwrap().location().pathname().unwrap_or_default();
-    let segments: Vec<&str> = path.split('/').collect();
-    let job_id = if segments.len() >= 4 && segments[1] == "jobs" && segments[3] == "edit" {
-        segments[2].to_string()
-    } else {
-        String::new()
-    };
+    let params = use_params_map();
+    let job_id = params.with(|p| p.get("id").unwrap_or_default());
 
     let (loading, set_loading) = signal(true);
     let (load_error, set_load_error) = signal(None::<String>);

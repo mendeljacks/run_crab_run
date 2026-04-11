@@ -95,6 +95,25 @@ pub async fn fetch_run(id: &str) -> Result<Run, String> {
     api_get(&format!("/runs/{}", id)).await
 }
 
+/// Cancel a running job.
+pub async fn cancel_run(id: &str) -> Result<(), String> {
+    let resp = Request::delete(&format!("/api/runs/{}", id))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.ok() {
+        let text = resp.text().await.unwrap_or_default();
+        let msg = serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| v["error"].as_str().map(String::from))
+            .unwrap_or(text);
+        return Err(msg);
+    }
+
+    Ok(())
+}
+
 fn url_encode(s: &str) -> String {
     s.replace('%', "%25")
         .replace(' ', "%20")

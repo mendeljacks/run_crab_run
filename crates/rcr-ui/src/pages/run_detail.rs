@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use leptos_router::hooks::use_params_map;
 use rcr_core::models::Run;
 
 use crate::api;
@@ -8,8 +9,8 @@ use crate::util::*;
 #[component]
 pub fn RunDetailPage() -> impl IntoView {
     // Extract run ID from the URL path: /runs/{id}
-    let path = web_sys::window().unwrap().location().pathname().unwrap_or_default();
-    let run_id = path.rsplit('/').next().unwrap_or_default().to_string();
+    let params = use_params_map();
+    let run_id = params.with(|p| p.get("id").unwrap_or_default());
 
     let (run, set_run) = signal(None::<Run>);
     let (loading, set_loading) = signal(true);
@@ -25,6 +26,27 @@ pub fn RunDetailPage() -> impl IntoView {
         set_loading.set(false);
     });
 
+    // Auto-refresh every 3s while running
+    {
+        let run_id_poll = run_id.clone();
+        let set_run = set_run;
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(3000).await;
+                match api::fetch_run(&run_id_poll).await {
+                    Ok(r) => {
+                        let is_running = r.status == rcr_core::models::RunStatus::Running;
+                        set_run.set(Some(r));
+                        if !is_running {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+    }
+
     view! {
         <div class="view">
             {move || if loading.get() {
@@ -34,6 +56,10 @@ pub fn RunDetailPage() -> impl IntoView {
             } else if let Some(r) = run.get() {
                 let (status_class, status_text) = status_badge(&r.status);
                 let job_id_link = r.job_id.clone();
+                let job_name_display = r.job_name.as_deref().unwrap_or(&r.job_id).to_string();
+                let is_running = r.status == rcr_core::models::RunStatus::Running;
+                let run_id_for_cancel = r.id.clone();
+                let command_display = r.command.as_deref().unwrap_or("—").to_string();
                 view! {
                     <>
                         <div class="view-header">
@@ -41,11 +67,27 @@ pub fn RunDetailPage() -> impl IntoView {
                             <span class=status_class>{status_text}</span>
                         </div>
 
+                        {if is_running {
+                            view! {
+                                <div class="alert alert-info">
+                                    <strong>"↻ Running…"</strong>" This job is currently executing. Page auto-refreshes."
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <div></div> }.into_any()
+                        }}
+
                         <div class="detail-grid">
                             <div class="detail-fact">
                                 <div class="detail-label">"Job"</div>
                                 <div class="detail-value">
-                                    <a href={format!("/runs?job_id={}", job_id_link)} class="job-link">{r.job_id.clone()}</a>
+                                    <a href={format!("/runs?job_id={}", job_id_link)} class="job-link">{job_name_display}</a>
+                                </div>
+                            </div>
+                            <div class="detail-fact">
+                                <div class="detail-label">"Command"</div>
+                                <div class="detail-value">
+                                    <code class="command-display">{command_display}</code>
                                 </div>
                             </div>
                             <div class="detail-fact">
@@ -98,8 +140,25 @@ pub fn RunDetailPage() -> impl IntoView {
                             </>
                         })}
 
-                        <div style="margin-top: 1.5rem">
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
                             <a href="/runs" class="btn btn-default">"← Back to Runs"</a>
+                            {if is_running {
+                                view! {
+                                    <button class="btn btn-danger" on:click=move |_| {
+                                        let id = run_id_for_cancel.clone();
+                                        spawn_local(async move {
+                                            let _ = api::cancel_run(&id).await;
+                                            // Refresh to see updated status
+                                            match api::fetch_run(&id).await {
+                                                Ok(updated) => set_run.set(Some(updated)),
+                                                Err(_) => {}
+                                            }
+                                        });
+                                    }>"✕ Cancel Run"</button>
+                                }.into_any()
+                            } else {
+                                view! { <div></div> }.into_any()
+                            }}
                         </div>
                     </>
                 }.into_any()

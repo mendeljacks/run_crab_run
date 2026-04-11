@@ -1,6 +1,6 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use rcr_core::models::run::{RunStatus, RunsFilter};
+use rcr_core::models::run::{RunStatus, RunsFilter, RunSummary};
 
 use crate::api;
 use crate::util::*;
@@ -9,7 +9,7 @@ const PAGE_SIZE: i64 = 25;
 
 #[component]
 pub fn RunsPage() -> impl IntoView {
-    let (runs_data, set_runs_data) = signal(None::<(Vec<rcr_core::models::run::RunSummary>, i64)>);
+    let (runs_data, set_runs_data) = signal(None::<(Vec<RunSummary>, i64)>);
     let (loading, set_loading) = signal(true);
     let (error, set_error) = signal(None::<String>);
     let (page, set_page) = signal(0i64);
@@ -71,6 +71,63 @@ pub fn RunsPage() -> impl IntoView {
                 set_loading.set(false);
             }
         }
+    });
+
+    // Live updates via SSE
+    let set_rd = set_runs_data;
+    spawn_local(async move {
+        use wasm_bindgen::prelude::*;
+        use wasm_bindgen::JsCast;
+
+        let es = match web_sys::EventSource::new("/api/events/runs") {
+            Ok(es) => es,
+            Err(_) => return,
+        };
+
+        // When we receive "recent" events, replace the entire list
+        let on_recent = Closure::<dyn Fn(_)>::new(move |evt: web_sys::MessageEvent| {
+            if let Some(text) = evt.data().as_string() {
+                if let Ok(runs) = serde_json::from_str::<Vec<RunSummary>>(&text) {
+                    set_rd.update(|current| {
+                        if let Some((_, total)) = current {
+                            *current = Some((runs, *total));
+                        } else {
+                            *current = Some((runs, 0));
+                        }
+                    });
+                }
+            }
+        });
+        es.add_event_listener_with_callback("recent", on_recent.as_ref().unchecked_ref())
+            .unwrap();
+        on_recent.forget();
+
+        // "running" events update running statuses in place
+        let on_running = Closure::<dyn Fn(_)>::new(move |evt: web_sys::MessageEvent| {
+            if let Some(text) = evt.data().as_string() {
+                if let Ok(running) = serde_json::from_str::<Vec<RunSummary>>(&text) {
+                    set_rd.update(|current| {
+                        if let Some((ref mut runs, _)) = current {
+                            // Mark any previously-running run not in the running list as needing refresh
+                            for rr in &running {
+                                if let Some(existing) = runs.iter_mut().find(|r| r.id == rr.id) {
+                                    *existing = rr.clone();
+                                }
+                            }
+                            // Prepend new running runs
+                            for rr in &running {
+                                if !runs.iter().any(|r| r.id == rr.id) {
+                                    runs.insert(0, rr.clone());
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        });
+        es.add_event_listener_with_callback("running", on_running.as_ref().unchecked_ref())
+            .unwrap();
+        on_running.forget();
     });
 
     let total_pages = move || {
@@ -152,6 +209,7 @@ pub fn RunsPage() -> impl IntoView {
                                         <tr>
                                             <th>"ID"</th>
                                             <th>"Job"</th>
+                                            <th>"Command"</th>
                                             <th>"Status"</th>
                                             <th>"Trigger"</th>
                                             <th>"Duration"</th>
@@ -162,12 +220,18 @@ pub fn RunsPage() -> impl IntoView {
                                         {runs.into_iter().map(|run| {
                                             let (sc, st) = status_badge(&run.status);
                                             let rid = run.id.clone();
+                                            let cmd_short = if run.command.len() > 60 {
+                                                format!("{}…", &run.command[..60])
+                                            } else {
+                                                run.command.clone()
+                                            };
                                             view! {
                                                 <tr class="clickable" on:click=move |_| {
                                                     let _ = web_sys::window().unwrap().location().set_href(&format!("/runs/{}", rid));
                                                 }>
                                                     <td><code>{short_id(&run.id)}</code></td>
                                                     <td>{run.job_name.clone()}</td>
+                                                    <td><code title={run.command.clone()}>{cmd_short}</code></td>
                                                     <td><span class=sc>{st}</span></td>
                                                     <td>{format_trigger(&run.trigger)}</td>
                                                     <td>{format_duration(run.duration_ms)}</td>

@@ -14,10 +14,11 @@ impl Database {
             .map(|v| serde_json::to_string(v).unwrap());
 
         sqlx::query(
-            "INSERT INTO runs (id, job_id, trigger, status, started_at, webhook_args) VALUES (?, ?, ?, 'running', ?, ?)"
+            "INSERT INTO runs (id, job_id, command, trigger, status, started_at, webhook_args) VALUES (?, ?, ?, ?, 'running', ?, ?)"
         )
         .bind(&id)
         .bind(&create.job_id)
+        .bind(&create.command)
         .bind(&trigger_str)
         .bind(now.to_rfc3339())
         .bind(&webhook_args_str)
@@ -28,6 +29,8 @@ impl Database {
         Ok(Run {
             id,
             job_id: create.job_id,
+            job_name: None, // populated on read via join
+            command: Some(create.command),
             trigger: create.trigger,
             status: RunStatus::Running,
             exit_code: None,
@@ -78,15 +81,28 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_run(&self, id: &str) -> Result<Run, Error> {
-        let row = sqlx::query_as::<_, RunRow>("SELECT * FROM runs WHERE id = ?")
+    pub async fn update_run_status(&self, id: &str, status: RunStatus) -> Result<(), Error> {
+        let status_str = status.to_string();
+        sqlx::query("UPDATE runs SET status=? WHERE id=?")
+            .bind(&status_str)
             .bind(id)
-            .fetch_one(self.pool())
+            .execute(self.pool())
             .await
-            .map_err(|e| match e {
-                sqlx::Error::RowNotFound => Error::RunNotFound(id.to_string()),
-                other => Error::Database(other.to_string()),
-            })?;
+            .map_err(|e| Error::Database(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_run(&self, id: &str) -> Result<Run, Error> {
+        let row = sqlx::query_as::<_, RunRow>(
+            "SELECT r.*, j.name as job_name FROM runs r JOIN jobs j ON r.job_id = j.id WHERE r.id = ?"
+        )
+        .bind(id)
+        .fetch_one(self.pool())
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => Error::RunNotFound(id.to_string()),
+            other => Error::Database(other.to_string()),
+        })?;
         row.into_model()
     }
 
@@ -110,7 +126,6 @@ impl Database {
         let where_str = where_clauses.join(" AND ");
         let count_where_str = count_where.join(" AND ");
 
-        // Determine ORDER BY
         let sort_by = filter.sort_by.as_deref().unwrap_or("started_at");
         let sort_col = match sort_by {
             "duration" | "duration_ms" => "r.duration_ms",
@@ -145,7 +160,7 @@ impl Database {
 
         // Data query
         let data_sql = format!(
-            "SELECT r.id, r.job_id, j.name as job_name, r.trigger, r.status, r.exit_code, r.duration_ms, r.cpu_pct, r.mem_kb, r.started_at, r.finished_at FROM runs r JOIN jobs j ON r.job_id = j.id WHERE {} ORDER BY {} {}",
+            "SELECT r.id, r.job_id, j.name as job_name_from_join, r.command, r.trigger, r.status, r.exit_code, r.duration_ms, r.cpu_pct, r.mem_kb, r.started_at, r.finished_at FROM runs r JOIN jobs j ON r.job_id = j.id WHERE {} ORDER BY {} {}",
             where_str, sort_col, sort_dir
         );
 
@@ -208,6 +223,8 @@ impl Database {
 struct RunRow {
     id: String,
     job_id: String,
+    job_name: Option<String>,
+    command: Option<String>,
     trigger: String,
     status: String,
     exit_code: Option<i32>,
@@ -227,6 +244,8 @@ impl RunRow {
         Ok(Run {
             id: self.id,
             job_id: self.job_id,
+            job_name: self.job_name,
+            command: self.command,
             trigger: parse_trigger(&self.trigger)?,
             status: parse_status(&self.status)?,
             exit_code: self.exit_code,
@@ -254,7 +273,8 @@ impl RunRow {
 struct RunSummaryRow {
     id: String,
     job_id: String,
-    job_name: String,
+    job_name_from_join: String,
+    command: Option<String>,
     trigger: String,
     status: String,
     exit_code: Option<i32>,
@@ -270,7 +290,8 @@ impl RunSummaryRow {
         Ok(RunSummary {
             id: self.id,
             job_id: self.job_id,
-            job_name: self.job_name,
+            job_name: self.job_name_from_join,
+            command: self.command.unwrap_or_default(),
             trigger: parse_trigger(&self.trigger)?,
             status: parse_status(&self.status)?,
             exit_code: self.exit_code,
