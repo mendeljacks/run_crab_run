@@ -7,14 +7,6 @@ use rcr_runner::notify::{EmailNotifier, NoopNotifier};
 use std::sync::Arc;
 use tracing::info;
 
-/// Environment variables:
-///   RCR_HOST         — bind address (default: 0.0.0.0)
-///   RCR_PORT         — bind port (default: 3001)
-///   RCR_DB_PATH      — SQLite database path (default: run_crab_run.db)
-///   RCR_CORS_ORIGINS — comma-separated allowed origins (default: http://localhost:8080)
-///   RCR_EMAIL_SMTP_HOST / RCR_EMAIL_SMTP_PORT / RCR_EMAIL_SMTP_USER /
-///   RCR_EMAIL_SMTP_PASS / RCR_EMAIL_FROM — optional email notification
-
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -27,16 +19,10 @@ async fn main() -> Result<()> {
     let host = env("RCR_HOST", "0.0.0.0");
     let port: u16 = env_parse("RCR_PORT", 3001);
     let db_path = env("RCR_DB_PATH", "run_crab_run.db");
-    let cors_origins: Vec<String> = env("RCR_CORS_ORIGINS", "http://localhost:8080")
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
 
     info!("🦀 rcr-api starting...");
     info!("Database: {}", db_path);
     info!("Listening on {}:{}", host, port);
-    info!("CORS origins: {:?}", cors_origins);
 
     let db = Database::new(&db_path).await?;
 
@@ -58,8 +44,7 @@ async fn main() -> Result<()> {
     let executor = Arc::new(JobExecutor::new(db.clone(), notifier));
     let state = AppState { db, executor };
 
-    let server_config = rcr_core::models::config::ServerConfig { host: host.clone(), port, cors_origins };
-    let app = rcr_api::routes::router(state, &server_config);
+    let app = rcr_api::routes::router(state);
 
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", host, port)).await?;
     info!("🦀 API server running on {}:{}", host, port);

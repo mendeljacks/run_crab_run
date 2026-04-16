@@ -28,4 +28,3 @@ hex = { workspace = true }
 futures = { workspace = true }
 async-stream = { workspace = true }
 tokio-stream = { workspace = true }
-http = "1"

@@ -2002,7 +2002,6 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
- "http",
  "rcr-core",
  "rcr-db",
  "rcr-runner",
