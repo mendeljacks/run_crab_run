@@ -1,6 +1,5 @@
 pub mod jobs;
 pub mod runs;
-pub mod webhooks;
 pub mod migrations;
 
 use rcr_core::Error;
@@ -43,14 +42,20 @@ impl Database {
             .map_err(|e| Error::Database(e.to_string()))?;
 
         // Future migrations go here:
-        // let applied: Vec<String> = sqlx::query_scalar::<_, String>(
-        //     "SELECT id FROM _migrations ORDER BY id"
-        // ).fetch_all(&self.pool).await.map_err(|e| Error::Database(e.to_string()))?;
-        //
-        // if !applied.iter().any(|a| a == "002") {
-        //     sqlx::query(migrations::MIGRATION_002) ...
-        //     sqlx::query("INSERT INTO _migrations (id) VALUES ('002')") ...
-        // }
+        let applied: Vec<String> = sqlx::query_scalar::<_, String>(
+            "SELECT id FROM _migrations ORDER BY id"
+        ).fetch_all(&self.pool).await.map_err(|e| Error::Database(e.to_string()))?;
+
+        if !applied.iter().any(|a| a == "002") {
+            sqlx::query(migrations::MIGRATION_002)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| Error::Database(e.to_string()))?;
+            sqlx::query("INSERT INTO _migrations (id) VALUES ('002')")
+                .execute(&self.pool)
+                .await
+                .map_err(|e| Error::Database(e.to_string()))?;
+        }
 
         Ok(())
     }

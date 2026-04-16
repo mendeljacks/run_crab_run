@@ -41,7 +41,6 @@ pub struct Run {
     pub started_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
     pub duration_ms: Option<i64>,
-    pub webhook_args: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,7 +48,6 @@ pub struct CreateRun {
     pub job_id: String,
     pub command: String,
     pub trigger: Trigger,
-    pub webhook_args: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

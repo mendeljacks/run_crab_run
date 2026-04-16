@@ -14,7 +14,6 @@ use crate::monitor::ProcessMonitor;
 /// A pending run that will execute after the current one finishes.
 struct PendingRun {
     trigger: Trigger,
-    webhook_args: Option<serde_json::Value>,
 }
 
 /// Tracks in-flight runs per job for debounce/coalesce logic.
@@ -36,13 +35,12 @@ impl JobExecutor {
     }
 
     /// Trigger a job run.
-    /// If the job is already running, coalesce: queue one re-run with the latest args.
+    /// If the job is already running, coalesce: queue one re-run.
     /// Returns the run ID (or "pending:{job_id}" if coalesced).
     pub async fn trigger_job(
         &self,
         job: &Job,
         trigger: Trigger,
-        webhook_args: Option<serde_json::Value>,
     ) -> Result<String, Error> {
         let job_id = job.id.clone();
 
@@ -51,11 +49,11 @@ impl JobExecutor {
             // Job is currently running — coalesce
             info!(job_id = %job.id, "Job already running, coalescing pending run");
             let state = states.get_mut(&job_id).unwrap();
-            state.pending = Some(PendingRun { trigger, webhook_args });
+            state.pending = Some(PendingRun { trigger });
             Ok(format!("pending:{}", job_id))
         } else {
             // Start immediately
-            let run_id = self.spawn_run(job.id.clone(), trigger, webhook_args.clone(), job.clone()).await?;
+            let run_id = self.spawn_run(job.id.clone(), trigger, job.clone()).await?;
             states.insert(job_id, JobRunState { pending: None });
             Ok(run_id)
         }
@@ -65,14 +63,12 @@ impl JobExecutor {
         &self,
         job_id: String,
         trigger: Trigger,
-        webhook_args: Option<serde_json::Value>,
         job: Job,
     ) -> Result<String, Error> {
         let create = rcr_core::models::run::CreateRun {
             job_id: job.id.clone(),
             command: job.command.clone(),
             trigger: trigger.clone(),
-            webhook_args: webhook_args.clone(),
         };
 
         let run = self.db.create_run(create).await?;
@@ -89,8 +85,7 @@ impl JobExecutor {
             let result = execute_command(
                 &job.command,
                 &job.env_vars,
-                None, // no timeout (removed feature)
-                webhook_args.clone(),
+                None, // no timeout
                 job.containerized,
                 job.container_image.as_deref(),
             ).await;
@@ -129,7 +124,6 @@ impl JobExecutor {
                             job_id: job_id2.clone(),
                             command: job2.command.clone(),
                             trigger: pending.trigger,
-                            webhook_args: pending.webhook_args,
                         };
 
                         let run = match db2.create_run(create).await {
@@ -147,7 +141,6 @@ impl JobExecutor {
                             &job2.command,
                             &job2.env_vars,
                             None,
-                            run.webhook_args.clone(),
                             job2.containerized,
                             job2.container_image.as_deref(),
                         ).await;
@@ -203,27 +196,17 @@ async fn execute_command(
     command: &str,
     env_vars: &serde_json::Value,
     _timeout: Option<Duration>,
-    override_env: Option<serde_json::Value>,
     containerized: bool,
     container_image: Option<&str>,
 ) -> Result<CommandOutput, ExecutionError> {
     let start = std::time::Instant::now();
 
-    // Merge static env_vars with webhook override_env (override wins)
+    // Build env from job's env_vars
     let mut env = std::collections::HashMap::new();
     if let Some(obj) = env_vars.as_object() {
         for (k, v) in obj {
             if let Some(s) = v.as_str() {
                 env.insert(k.clone(), s.to_string());
-            }
-        }
-    }
-    if let Some(override_env) = &override_env {
-        if let Some(obj) = override_env.as_object() {
-            for (k, v) in obj {
-                if let Some(s) = v.as_str() {
-                    env.insert(k.clone(), s.to_string());
-                }
             }
         }
     }

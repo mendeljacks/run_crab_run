@@ -18,7 +18,6 @@ pub fn EditJobPage() -> impl IntoView {
     let (schedule, set_schedule) = signal(String::new());
     let (containerized, set_containerized) = signal(false);
     let (container_image, set_container_image) = signal("alpine:latest".to_string());
-    let (webhook_secret, set_webhook_secret) = signal(String::new());
     let (submitting, set_submitting) = signal(false);
     let (submit_error, set_submit_error) = signal(None::<String>);
     let (success, set_success) = signal(false);
@@ -32,7 +31,6 @@ pub fn EditJobPage() -> impl IntoView {
                 set_schedule.set(j.schedule.clone().unwrap_or_default());
                 set_containerized.set(j.containerized);
                 set_container_image.set(j.container_image.clone().unwrap_or_else(|| "alpine:latest".to_string()));
-                set_webhook_secret.set(j.webhook_secret.clone().unwrap_or_default());
                 set_loading.set(false);
             }
             Err(e) => {
@@ -55,16 +53,6 @@ pub fn EditJobPage() -> impl IntoView {
         }
     };
 
-    let webhook_url_preview = move || {
-        let n = name.get();
-        if n.is_empty() {
-            "/api/hook/{webhook_name}".to_string()
-        } else {
-            let slug = n.to_lowercase().replace(|c: char| !c.is_alphanumeric() && c != '-', "-");
-            format!("/api/hook/{}", slug)
-        }
-    };
-
     let job_id_stored = StoredValue::new(job_id.clone());
 
     let on_submit = move |ev: leptos::ev::SubmitEvent| {
@@ -74,7 +62,6 @@ pub fn EditJobPage() -> impl IntoView {
 
         let is_containerized = containerized.get();
         let sched = schedule.get();
-        let ws = webhook_secret.get();
         let ci = container_image.get();
         let update = UpdateJob {
             name: Some(name.get()),
@@ -83,7 +70,6 @@ pub fn EditJobPage() -> impl IntoView {
             enabled: None,
             max_concurrent: None,
             env_vars: None,
-            webhook_secret: if ws.is_empty() { None } else { Some(ws) },
             containerized: Some(is_containerized),
             container_image: if is_containerized { Some(ci) } else { None },
         };
@@ -146,7 +132,7 @@ pub fn EditJobPage() -> impl IntoView {
                                         value=schedule.get()
                                         placeholder="FREQ=DAILY;BYHOUR=9"
                                         on:input=move |ev| set_schedule.set(event_target_value(&ev)) />
-                                    <div class="form-hint">"RRULE format, or leave empty for manual/webhook-only"</div>
+                                    <div class="form-hint">"RRULE format, or leave empty for manual-only"</div>
                                 </div>
 
                                 <div class="form-group-half">
@@ -173,13 +159,6 @@ pub fn EditJobPage() -> impl IntoView {
                                     view! { <div></div> }.into_any()
                                 }}
 
-                                <div class="form-group">
-                                    <label>"Webhook Secret (optional)"</label>
-                                    <input class="form-input" type="text"
-                                        value=webhook_secret.get()
-                                        on:input=move |ev| set_webhook_secret.set(event_target_value(&ev)) />
-                                </div>
-
                                 <div class="form-actions">
                                     <button class="btn btn-primary" type="submit"
                                         disabled=move || submitting.get()>
@@ -199,42 +178,6 @@ pub fn EditJobPage() -> impl IntoView {
                                 }}
                             </div>
                         </form>
-                    </div>
-
-                    <div class="card" style="max-width: 800px; margin-top: 1.5rem;">
-                        <h3 style="margin-bottom: 0.75rem;">"🔗 GitHub Webhook Setup"</h3>
-                        <p class="form-hint" style="margin-bottom: 1rem;">
-                            "To trigger this job from GitHub, create a webhook in your repository settings pointing to the URL below."
-                        </p>
-                        <div class="webhook-section">
-                            <div class="webhook-field">
-                                <label>"Webhook URL"</label>
-                                <code class="webhook-url">{webhook_url_preview}</code>
-                            </div>
-                            <div class="webhook-field">
-                                <label>"Content type"</label>
-                                <code>"application/json"</code>
-                            </div>
-                            <div class="webhook-field">
-                                <label>"Secret"</label>
-                                <code>"(the secret you set above)"</code>
-                            </div>
-                            <div class="webhook-field">
-                                <label>"Events"</label>
-                                <span>"Just the push event, or customize"</span>
-                            </div>
-                        </div>
-                        <div class="webhook-steps">
-                            <h4>"Setup Steps"</h4>
-                            <ol>
-                                <li>"Go to your GitHub repo → Settings → Webhooks → Add webhook"</li>
-                                <li>"Set the Payload URL to your server address + the webhook path above"</li>
-                                <li>"Set Content type to application/json"</li>
-                                <li>"Set the Secret to match the webhook secret configured for this job"</li>
-                                <li>"Choose which events should trigger the webhook (e.g., push events)"</li>
-                                <li>"Save the webhook — pushes to the repo will now trigger the job"</li>
-                            </ol>
-                        </div>
                     </div>
                 }.into_any()
             }}

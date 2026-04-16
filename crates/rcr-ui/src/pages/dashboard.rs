@@ -89,7 +89,7 @@ pub fn DashboardPage() -> impl IntoView {
                                     <div class="job-grid">
                                         {j.iter().map(|job| {
                                             let (badge_class, badge_text) = enabled_badge(job.enabled);
-                                            let schedule = job.schedule.clone().map(|s| format!("📅 {}", s)).unwrap_or_else(|| "⚡ Manual / Webhook".to_string());
+                                            let schedule = job.schedule.clone().map(|s| format!("📅 {}", s)).unwrap_or_else(|| "⚡ Manual".to_string());
                                             let id_trigger = job.id.clone();
                                             let id_delete = job.id.clone();
                                             let id_edit = job.id.clone();

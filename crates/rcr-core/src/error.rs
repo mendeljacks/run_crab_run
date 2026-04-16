@@ -17,9 +17,6 @@ pub enum Error {
     #[error("Invalid command: {0}")]
     InvalidCommand(String),
 
-    #[error("Webhook secret mismatch")]
-    WebhookSecretMismatch,
-
     #[error("Database error: {0}")]
     Database(String),
 

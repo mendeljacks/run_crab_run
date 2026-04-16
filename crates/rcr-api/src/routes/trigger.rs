@@ -12,7 +12,7 @@ pub async fn trigger_job(
     let job = state.db.get_job(&id).await?;
     state
         .executor
-        .trigger_job(&job, Trigger::Manual, None)
+        .trigger_job(&job, Trigger::Manual)
         .await?;
     Ok(Json(serde_json::json!({ "triggered": true, "job_id": id })))
 }

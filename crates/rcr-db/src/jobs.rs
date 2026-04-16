@@ -6,7 +6,7 @@ impl Database {
     pub async fn create_job(&self, create: CreateJob) -> Result<Job, Error> {
         let job = Job::new(create);
         sqlx::query(
-            "INSERT INTO jobs (id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO jobs (id, name, command, schedule, enabled, max_concurrent, env_vars, containerized, container_image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&job.id)
         .bind(&job.name)
@@ -15,7 +15,6 @@ impl Database {
         .bind(job.enabled)
         .bind(job.max_concurrent)
         .bind(serde_json::to_string(&job.env_vars).unwrap())
-        .bind(&job.webhook_secret)
         .bind(job.containerized)
         .bind(&job.container_image)
         .bind(job.created_at.to_rfc3339())
@@ -28,7 +27,7 @@ impl Database {
 
     pub async fn get_job(&self, id: &str) -> Result<Job, Error> {
         let row = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs WHERE id = ?"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, containerized, container_image, created_at, updated_at FROM jobs WHERE id = ?"
         )
         .bind(id)
         .fetch_one(self.pool())
@@ -42,7 +41,7 @@ impl Database {
 
     pub async fn list_jobs(&self) -> Result<Vec<Job>, Error> {
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs ORDER BY created_at DESC"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, containerized, container_image, created_at, updated_at FROM jobs ORDER BY created_at DESC"
         )
         .fetch_all(self.pool())
         .await
@@ -59,14 +58,13 @@ impl Database {
         let enabled = update.enabled.unwrap_or(existing.enabled);
         let max_concurrent = update.max_concurrent.unwrap_or(existing.max_concurrent);
         let env_vars = update.env_vars.unwrap_or(existing.env_vars);
-        let webhook_secret = update.webhook_secret.or(existing.webhook_secret);
         let containerized = update.containerized.unwrap_or(existing.containerized);
         let container_image = update.container_image.or(existing.container_image);
 
         let now = chrono::Utc::now();
 
         sqlx::query(
-            "UPDATE jobs SET name=?, command=?, schedule=?, enabled=?, max_concurrent=?, env_vars=?, webhook_secret=?, containerized=?, container_image=?, updated_at=? WHERE id=?"
+            "UPDATE jobs SET name=?, command=?, schedule=?, enabled=?, max_concurrent=?, env_vars=?, containerized=?, container_image=?, updated_at=? WHERE id=?"
         )
         .bind(&name)
         .bind(&command)
@@ -74,7 +72,6 @@ impl Database {
         .bind(enabled)
         .bind(max_concurrent)
         .bind(serde_json::to_string(&env_vars).unwrap())
-        .bind(&webhook_secret)
         .bind(containerized)
         .bind(&container_image)
         .bind(now.to_rfc3339())
@@ -100,7 +97,7 @@ impl Database {
 
     pub async fn get_enabled_scheduled_jobs(&self) -> Result<Vec<Job>, Error> {
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs WHERE enabled = 1 AND schedule IS NOT NULL"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, containerized, container_image, created_at, updated_at FROM jobs WHERE enabled = 1 AND schedule IS NOT NULL"
         )
         .fetch_all(self.pool())
         .await
@@ -119,7 +116,6 @@ struct JobRow {
     enabled: bool,
     max_concurrent: i32,
     env_vars: String,
-    webhook_secret: Option<String>,
     containerized: bool,
     container_image: Option<String>,
     created_at: String,
@@ -136,7 +132,6 @@ impl JobRow {
             enabled: self.enabled,
             max_concurrent: self.max_concurrent,
             env_vars: serde_json::from_str(&self.env_vars).unwrap_or_default(),
-            webhook_secret: self.webhook_secret,
             containerized: self.containerized,
             container_image: self.container_image,
             created_at: chrono::DateTime::parse_from_rfc3339(&self.created_at)

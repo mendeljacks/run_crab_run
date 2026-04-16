@@ -8,20 +8,15 @@ impl Database {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
         let trigger_str = create.trigger.to_string();
-        let webhook_args_str = create
-            .webhook_args
-            .as_ref()
-            .map(|v| serde_json::to_string(v).unwrap());
 
         sqlx::query(
-            "INSERT INTO runs (id, job_id, command, trigger, status, started_at, webhook_args) VALUES (?, ?, ?, ?, 'running', ?, ?)"
+            "INSERT INTO runs (id, job_id, command, trigger, status, started_at) VALUES (?, ?, ?, ?, 'running', ?)"
         )
         .bind(&id)
         .bind(&create.job_id)
         .bind(&create.command)
         .bind(&trigger_str)
         .bind(now.to_rfc3339())
-        .bind(&webhook_args_str)
         .execute(self.pool())
         .await
         .map_err(|e| Error::Database(e.to_string()))?;
@@ -42,7 +37,6 @@ impl Database {
             started_at: now,
             finished_at: None,
             duration_ms: None,
-            webhook_args: create.webhook_args,
         })
     }
 
@@ -94,7 +88,7 @@ impl Database {
 
     pub async fn get_run(&self, id: &str) -> Result<Run, Error> {
         let row = sqlx::query_as::<_, RunRow>(
-            "SELECT r.*, j.name as job_name FROM runs r JOIN jobs j ON r.job_id = j.id WHERE r.id = ?"
+            "SELECT r.id, r.job_id, j.name as job_name, r.command, r.trigger, r.status, r.exit_code, r.stdout, r.stderr, r.error_message, r.cpu_pct, r.mem_kb, r.started_at, r.finished_at, r.duration_ms FROM runs r JOIN jobs j ON r.job_id = j.id WHERE r.id = ?"
         )
         .bind(id)
         .fetch_one(self.pool())
@@ -236,7 +230,6 @@ struct RunRow {
     started_at: String,
     finished_at: Option<String>,
     duration_ms: Option<i64>,
-    webhook_args: Option<String>,
 }
 
 impl RunRow {
@@ -263,8 +256,6 @@ impl RunRow {
                     .map(|d| d.into()))
                 .transpose()?,
             duration_ms: self.duration_ms,
-            webhook_args: self.webhook_args
-                .and_then(|s| serde_json::from_str(&s).ok()),
         })
     }
 }
@@ -315,8 +306,6 @@ fn parse_trigger(s: &str) -> Result<Trigger, Error> {
         Ok(Trigger::Schedule)
     } else if s == "manual" {
         Ok(Trigger::Manual)
-    } else if let Some(name) = s.strip_prefix("webhook:") {
-        Ok(Trigger::Webhook { name: name.to_string() })
     } else {
         Err(Error::Database(format!("Invalid trigger: {}", s)))
     }

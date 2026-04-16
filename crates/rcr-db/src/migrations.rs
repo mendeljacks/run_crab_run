@@ -53,3 +53,9 @@ CREATE TABLE IF NOT EXISTS webhook_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_webhooks_job_id ON webhook_subscriptions(job_id);
 "#;
+
+pub const MIGRATION_002: &str = r#"
+DROP TABLE IF EXISTS webhook_subscriptions;
+ALTER TABLE jobs DROP COLUMN webhook_secret;
+ALTER TABLE runs DROP COLUMN webhook_args;
+"#;

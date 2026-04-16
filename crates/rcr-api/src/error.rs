@@ -12,7 +12,6 @@ impl IntoResponse for ApiError {
             Error::RunNotFound(_) => (StatusCode::NOT_FOUND, self.0.to_string()),
             Error::InvalidRrule(_) => (StatusCode::BAD_REQUEST, self.0.to_string()),
             Error::InvalidCommand(_) => (StatusCode::BAD_REQUEST, self.0.to_string()),
-            Error::WebhookSecretMismatch => (StatusCode::UNAUTHORIZED, self.0.to_string()),
             Error::JobAlreadyRunning(_) => (StatusCode::CONFLICT, self.0.to_string()),
             Error::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.0.to_string()),
             Error::Execution(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.0.to_string()),

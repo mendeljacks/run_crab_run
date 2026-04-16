@@ -92,7 +92,7 @@ impl Scheduler {
         if !due.dates.is_empty() {
             info!(job_id = %job.id, "Triggering scheduled job");
             self.executor
-                .trigger_job(job, Trigger::Schedule, None)
+                .trigger_job(job, Trigger::Schedule)
                 .await?;
         }
 

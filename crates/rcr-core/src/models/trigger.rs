@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub enum Trigger {
     Schedule,
     Manual,
-    Webhook { name: String },
 }
 
 impl std::fmt::Display for Trigger {
@@ -13,7 +12,6 @@ impl std::fmt::Display for Trigger {
         match self {
             Trigger::Schedule => write!(f, "schedule"),
             Trigger::Manual => write!(f, "manual"),
-            Trigger::Webhook { name } => write!(f, "webhook:{}", name),
         }
     }
 }

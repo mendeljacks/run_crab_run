@@ -74,7 +74,6 @@ pub fn format_trigger(trigger: &Trigger) -> String {
     match trigger {
         Trigger::Schedule => "📅 schedule".to_string(),
         Trigger::Manual => "⚡ manual".to_string(),
-        Trigger::Webhook { name } => format!("🔗 webhook:{}", name),
     }
 }
 
