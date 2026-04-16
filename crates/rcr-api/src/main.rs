@@ -1,9 +1,7 @@
 use anyhow::Result;
 use rcr_api::AppState;
-use rcr_core::notify::Notifier;
 use rcr_db::Database;
 use rcr_runner::JobExecutor;
-use rcr_runner::notify::{EmailNotifier, NoopNotifier};
 use std::sync::Arc;
 use tracing::info;
 
@@ -26,22 +24,7 @@ async fn main() -> Result<()> {
 
     let db = Database::new(&db_path).await?;
 
-    let notifier: Arc<dyn Notifier> = match std::env::var("RCR_EMAIL_SMTP_HOST") {
-        Ok(smtp_host) => {
-            let smtp_port: u16 = env_parse("RCR_EMAIL_SMTP_PORT", 587);
-            let smtp_user = env("RCR_EMAIL_SMTP_USER", "");
-            let smtp_pass = env("RCR_EMAIL_SMTP_PASS", "");
-            let from = env("RCR_EMAIL_FROM", "");
-            info!("Email notifier configured (SMTP: {}:{})", smtp_host, smtp_port);
-            Arc::new(EmailNotifier::new(smtp_host, smtp_port, smtp_user, smtp_pass, from))
-        }
-        Err(_) => {
-            info!("No email config, notifications disabled");
-            Arc::new(NoopNotifier)
-        }
-    };
-
-    let executor = Arc::new(JobExecutor::new(db.clone(), notifier));
+    let executor = Arc::new(JobExecutor::new(db.clone()));
     let state = AppState { db, executor };
 
     let app = rcr_api::routes::router(state);

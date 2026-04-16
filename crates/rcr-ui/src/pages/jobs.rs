@@ -46,7 +46,6 @@ pub fn JobsPage() -> impl IntoView {
                                         <th>"Schedule"</th>
                                         <th>"Status"</th>
                                         <th>"Container"</th>
-                                        <th>"Notify"</th>
                                         <th>"Actions"</th>
                                     </tr>
                                 </thead>
@@ -72,13 +71,6 @@ pub fn JobsPage() -> impl IntoView {
                                                 <td>
                                                     {if job.containerized {
                                                         "🐳 Yes".to_string()
-                                                    } else {
-                                                        "—".to_string()
-                                                    }}
-                                                </td>
-                                                <td>
-                                                    {if job.notify {
-                                                        format!("📧 {}", job.notify_email.as_deref().unwrap_or("—"))
                                                     } else {
                                                         "—".to_string()
                                                     }}

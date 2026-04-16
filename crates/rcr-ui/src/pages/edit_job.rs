@@ -18,8 +18,6 @@ pub fn EditJobPage() -> impl IntoView {
     let (schedule, set_schedule) = signal(String::new());
     let (containerized, set_containerized) = signal(false);
     let (container_image, set_container_image) = signal("alpine:latest".to_string());
-    let (notify, set_notify) = signal(false);
-    let (notify_email, set_notify_email) = signal(String::new());
     let (webhook_secret, set_webhook_secret) = signal(String::new());
     let (submitting, set_submitting) = signal(false);
     let (submit_error, set_submit_error) = signal(None::<String>);
@@ -34,8 +32,6 @@ pub fn EditJobPage() -> impl IntoView {
                 set_schedule.set(j.schedule.clone().unwrap_or_default());
                 set_containerized.set(j.containerized);
                 set_container_image.set(j.container_image.clone().unwrap_or_else(|| "alpine:latest".to_string()));
-                set_notify.set(j.notify);
-                set_notify_email.set(j.notify_email.clone().unwrap_or_default());
                 set_webhook_secret.set(j.webhook_secret.clone().unwrap_or_default());
                 set_loading.set(false);
             }
@@ -77,11 +73,9 @@ pub fn EditJobPage() -> impl IntoView {
         set_success.set(false);
 
         let is_containerized = containerized.get();
-        let is_notify = notify.get();
         let sched = schedule.get();
         let ws = webhook_secret.get();
         let ci = container_image.get();
-        let ne = notify_email.get();
         let update = UpdateJob {
             name: Some(name.get()),
             command: Some(command.get()),
@@ -92,8 +86,6 @@ pub fn EditJobPage() -> impl IntoView {
             webhook_secret: if ws.is_empty() { None } else { Some(ws) },
             containerized: Some(is_containerized),
             container_image: if is_containerized { Some(ci) } else { None },
-            notify: Some(is_notify),
-            notify_email: if is_notify && !ne.is_empty() { Some(ne) } else { None },
         };
 
         let id = job_id_stored.get_value();
@@ -166,15 +158,6 @@ pub fn EditJobPage() -> impl IntoView {
                                     </label>
                                 </div>
 
-                                <div class="form-group-half">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox"
-                                            checked=notify.get()
-                                            on:change=move |ev| set_notify.set(event_target_checked(&ev)) />
-                                        " Send Email Notification"
-                                    </label>
-                                </div>
-
                                 {move || if containerized.get() {
                                     view! {
                                         <div class="form-group">
@@ -184,21 +167,6 @@ pub fn EditJobPage() -> impl IntoView {
                                                 placeholder="alpine:latest"
                                                 on:input=move |ev| set_container_image.set(event_target_value(&ev)) />
                                             <div class="form-hint">"Docker image to use."</div>
-                                        </div>
-                                    }.into_any()
-                                } else {
-                                    view! { <div></div> }.into_any()
-                                }}
-
-                                {move || if notify.get() {
-                                    view! {
-                                        <div class="form-group">
-                                            <label>"Notification Email"</label>
-                                            <input class="form-input" type="email"
-                                                value=notify_email.get()
-                                                placeholder="devops@example.com"
-                                                on:input=move |ev| set_notify_email.set(event_target_value(&ev)) />
-                                            <div class="form-hint">"Email to receive results."</div>
                                         </div>
                                     }.into_any()
                                 } else {

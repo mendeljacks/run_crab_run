@@ -6,7 +6,7 @@ impl Database {
     pub async fn create_job(&self, create: CreateJob) -> Result<Job, Error> {
         let job = Job::new(create);
         sqlx::query(
-            "INSERT INTO jobs (id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, notify, notify_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO jobs (id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&job.id)
         .bind(&job.name)
@@ -18,8 +18,6 @@ impl Database {
         .bind(&job.webhook_secret)
         .bind(job.containerized)
         .bind(&job.container_image)
-        .bind(job.notify)
-        .bind(&job.notify_email)
         .bind(job.created_at.to_rfc3339())
         .bind(job.updated_at.to_rfc3339())
         .execute(self.pool())
@@ -30,7 +28,7 @@ impl Database {
 
     pub async fn get_job(&self, id: &str) -> Result<Job, Error> {
         let row = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, notify, notify_email, created_at, updated_at FROM jobs WHERE id = ?"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs WHERE id = ?"
         )
         .bind(id)
         .fetch_one(self.pool())
@@ -44,7 +42,7 @@ impl Database {
 
     pub async fn list_jobs(&self) -> Result<Vec<Job>, Error> {
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, notify, notify_email, created_at, updated_at FROM jobs ORDER BY created_at DESC"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs ORDER BY created_at DESC"
         )
         .fetch_all(self.pool())
         .await
@@ -64,13 +62,11 @@ impl Database {
         let webhook_secret = update.webhook_secret.or(existing.webhook_secret);
         let containerized = update.containerized.unwrap_or(existing.containerized);
         let container_image = update.container_image.or(existing.container_image);
-        let notify = update.notify.unwrap_or(existing.notify);
-        let notify_email = update.notify_email.or(existing.notify_email);
 
         let now = chrono::Utc::now();
 
         sqlx::query(
-            "UPDATE jobs SET name=?, command=?, schedule=?, enabled=?, max_concurrent=?, env_vars=?, webhook_secret=?, containerized=?, container_image=?, notify=?, notify_email=?, updated_at=? WHERE id=?"
+            "UPDATE jobs SET name=?, command=?, schedule=?, enabled=?, max_concurrent=?, env_vars=?, webhook_secret=?, containerized=?, container_image=?, updated_at=? WHERE id=?"
         )
         .bind(&name)
         .bind(&command)
@@ -81,8 +77,6 @@ impl Database {
         .bind(&webhook_secret)
         .bind(containerized)
         .bind(&container_image)
-        .bind(notify)
-        .bind(&notify_email)
         .bind(now.to_rfc3339())
         .bind(id)
         .execute(self.pool())
@@ -106,7 +100,7 @@ impl Database {
 
     pub async fn get_enabled_scheduled_jobs(&self) -> Result<Vec<Job>, Error> {
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, notify, notify_email, created_at, updated_at FROM jobs WHERE enabled = 1 AND schedule IS NOT NULL"
+            "SELECT id, name, command, schedule, enabled, max_concurrent, env_vars, webhook_secret, containerized, container_image, created_at, updated_at FROM jobs WHERE enabled = 1 AND schedule IS NOT NULL"
         )
         .fetch_all(self.pool())
         .await
@@ -128,8 +122,6 @@ struct JobRow {
     webhook_secret: Option<String>,
     containerized: bool,
     container_image: Option<String>,
-    notify: bool,
-    notify_email: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -147,8 +139,6 @@ impl JobRow {
             webhook_secret: self.webhook_secret,
             containerized: self.containerized,
             container_image: self.container_image,
-            notify: self.notify,
-            notify_email: self.notify_email,
             created_at: chrono::DateTime::parse_from_rfc3339(&self.created_at)
                 .map_err(|e| Error::Database(e.to_string()))?
                 .into(),

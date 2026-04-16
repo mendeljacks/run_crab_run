@@ -20,4 +20,3 @@ uuid = { workspace = true }
 rrule = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-lettre = { workspace = true }

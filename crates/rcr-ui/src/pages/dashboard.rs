@@ -107,8 +107,6 @@ pub fn DashboardPage() -> impl IntoView {
                                                     <div class="meta">{schedule}</div>
                                                     <div class="meta">
                                                         {if job.containerized { "🐳 Containerized" } else { "" }}
-                                                        " "
-                                                        {if job.notify { "📧 Notify" } else { "" }}
                                                     </div>
                                                     <div class="card-actions">
                                                         <button class="btn btn-primary btn-sm" on:click=move |_| {

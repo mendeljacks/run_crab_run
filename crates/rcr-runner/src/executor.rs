@@ -1,4 +1,3 @@
-use rcr_core::notify::Notifier;
 use rcr_core::models::job::Job;
 use rcr_core::models::run::RunStatus;
 use rcr_core::models::trigger::Trigger;
@@ -7,7 +6,7 @@ use rcr_db::Database;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use std::time::Duration;
 
 use crate::monitor::ProcessMonitor;
@@ -26,15 +25,13 @@ struct JobRunState {
 pub struct JobExecutor {
     db: Database,
     run_states: Arc<Mutex<HashMap<String, JobRunState>>>,
-    notifier: Arc<dyn Notifier>,
 }
 
 impl JobExecutor {
-    pub fn new(db: Database, notifier: Arc<dyn Notifier>) -> Self {
+    pub fn new(db: Database) -> Self {
         Self {
             db,
             run_states: Arc::new(Mutex::new(HashMap::new())),
-            notifier,
         }
     }
 
@@ -85,7 +82,6 @@ impl JobExecutor {
         info!(job_id = %job_id, run_id = %run_id, "Starting job execution");
 
         let db = self.db.clone();
-        let notifier = self.notifier.clone();
         let run_states = self.run_states.clone();
         let executor_self_job_id = job_id.clone();
 
@@ -116,17 +112,6 @@ impl JobExecutor {
                 error!(run_id = %run_id, error = %e, "Failed to update run record");
             }
 
-            // Notification
-            if job.notify {
-                if let Some(ref email) = job.notify_email {
-                    let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                    let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                    if let Err(e) = notifier.notify(&job.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
-                        warn!(error = %e, "Failed to send notification");
-                    }
-                }
-            }
-
             // Check for pending run and execute it
             let mut states = run_states.lock().await;
             if let Some(state) = states.get_mut(&executor_self_job_id) {
@@ -137,7 +122,6 @@ impl JobExecutor {
                     let db2 = db.clone();
                     let job_id2 = executor_self_job_id.clone();
                     let run_states2 = run_states.clone();
-                    let notifier2 = notifier.clone();
                     let job2 = job.clone();
 
                     tokio::spawn(async move {
@@ -182,17 +166,6 @@ impl JobExecutor {
 
                         if let Err(e) = db2.update_run_completed(&run_id, status, exit_code.clone(), stdout.clone(), stderr.clone(), error_message, cpu_pct, mem_kb, duration_ms).await {
                             error!(run_id = %run_id, error = %e, "Failed to update pending run record");
-                        }
-
-                        // Notification for pending run
-                        if job2.notify {
-                            if let Some(ref email) = job2.notify_email {
-                                let stdout_snippet = stdout.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                                let stderr_snippet = stderr.as_deref().unwrap_or("").chars().take(5000).collect::<String>();
-                                if let Err(e) = notifier2.notify(&job2.name, &run_id, status, exit_code, &stdout_snippet, &stderr_snippet, email) {
-                                    warn!(error = %e, "Failed to send notification for pending run");
-                                }
-                            }
                         }
 
                         let mut s = run_states2.lock().await;

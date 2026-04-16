@@ -13,8 +13,6 @@ pub struct Job {
     pub webhook_secret: Option<String>,
     pub containerized: bool,
     pub container_image: Option<String>,
-    pub notify: bool,
-    pub notify_email: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -30,8 +28,6 @@ pub struct CreateJob {
     pub webhook_secret: Option<String>,
     pub containerized: Option<bool>,
     pub container_image: Option<String>,
-    pub notify: Option<bool>,
-    pub notify_email: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,8 +41,6 @@ pub struct UpdateJob {
     pub webhook_secret: Option<String>,
     pub containerized: Option<bool>,
     pub container_image: Option<String>,
-    pub notify: Option<bool>,
-    pub notify_email: Option<String>,
 }
 
 impl Job {
@@ -63,8 +57,6 @@ impl Job {
             webhook_secret: create.webhook_secret,
             containerized: create.containerized.unwrap_or(false),
             container_image: create.container_image,
-            notify: create.notify.unwrap_or(false),
-            notify_email: create.notify_email,
             created_at: now,
             updated_at: now,
         }

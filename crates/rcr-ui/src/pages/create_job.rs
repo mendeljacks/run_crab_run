@@ -11,8 +11,6 @@ pub fn CreateJobPage() -> impl IntoView {
     let (schedule, set_schedule) = signal(String::new());
     let (containerized, set_containerized) = signal(false);
     let (container_image, set_container_image) = signal("alpine:latest".to_string());
-    let (notify, set_notify) = signal(false);
-    let (notify_email, set_notify_email) = signal(String::new());
     let (webhook_secret, set_webhook_secret) = signal(String::new());
     let (submitting, set_submitting) = signal(false);
     let (error, set_error) = signal(None::<String>);
@@ -54,7 +52,6 @@ pub fn CreateJobPage() -> impl IntoView {
         }
 
         let is_containerized = containerized.get();
-        let is_notify = notify.get();
         let create = CreateJob {
             name: n,
             command: c,
@@ -65,8 +62,6 @@ pub fn CreateJobPage() -> impl IntoView {
             webhook_secret: if webhook_secret.get().is_empty() { None } else { Some(webhook_secret.get()) },
             containerized: Some(is_containerized),
             container_image: if is_containerized { Some(container_image.get()) } else { None },
-            notify: Some(is_notify),
-            notify_email: if is_notify && !notify_email.get().is_empty() { Some(notify_email.get()) } else { None },
         };
 
         set_submitting.set(true);
@@ -133,15 +128,6 @@ pub fn CreateJobPage() -> impl IntoView {
                             </label>
                         </div>
 
-                        <div class="form-group-half">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    checked=notify.get()
-                                    on:change=move |ev| set_notify.set(event_target_checked(&ev)) />
-                                " Send Email Notification"
-                            </label>
-                        </div>
-
                         {move || if containerized.get() {
                             view! {
                                 <div class="form-group">
@@ -151,20 +137,6 @@ pub fn CreateJobPage() -> impl IntoView {
                                         placeholder="alpine:latest"
                                         on:input=move |ev| set_container_image.set(event_target_value(&ev)) />
                                     <div class="form-hint">"Docker image to use. The command will run inside a container."</div>
-                                </div>
-                            }.into_any()
-                        } else {
-                            view! { <div></div> }.into_any()
-                        }}
-
-                        {move || if notify.get() {
-                            view! {
-                                <div class="form-group">
-                                    <label>"Notification Email"</label>
-                                    <input class="form-input" type="email"
-                                        placeholder="devops@example.com"
-                                        on:input=move |ev| set_notify_email.set(event_target_value(&ev)) />
-                                    <div class="form-hint">"Email address to receive run results. The SMTP server must be configured."</div>
                                 </div>
                             }.into_any()
                         } else {
