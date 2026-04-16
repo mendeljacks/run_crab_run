@@ -79,7 +79,7 @@ pub fn RunsPage() -> impl IntoView {
         use wasm_bindgen::prelude::*;
         use wasm_bindgen::JsCast;
 
-        let es = match web_sys::EventSource::new("/api/events/runs") {
+        let es = match web_sys::EventSource::new(&crate::config::sse_url("/events/runs")) {
             Ok(es) => es,
             Err(_) => return,
         };

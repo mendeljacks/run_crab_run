@@ -4,6 +4,8 @@ use rcr_core::models::job::Job;
 use rcr_core::models::run::{RunsFilter, RunsResponse, Run};
 use serde::de::DeserializeOwned;
 
+use crate::config::api_base_url;
+
 /// Fetch all jobs.
 pub async fn fetch_jobs() -> Result<Vec<Job>, String> {
     api_get("/jobs").await
@@ -26,7 +28,7 @@ pub async fn update_job(id: &str, job: &UpdateJob) -> Result<Job, String> {
 
 /// Delete a job by ID.
 pub async fn delete_job(id: &str) -> Result<(), String> {
-    let resp = Request::delete(&format!("/api/jobs/{}", id))
+    let resp = Request::delete(&api_url(&format!("/jobs/{}", id)))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -45,7 +47,7 @@ pub async fn delete_job(id: &str) -> Result<(), String> {
 
 /// Trigger a job by ID.
 pub async fn trigger_job(id: &str) -> Result<(), String> {
-    let resp = Request::post(&format!("/api/jobs/{}/trigger", id))
+    let resp = Request::post(&api_url(&format!("/jobs/{}/trigger", id)))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -97,7 +99,7 @@ pub async fn fetch_run(id: &str) -> Result<Run, String> {
 
 /// Cancel a running job.
 pub async fn cancel_run(id: &str) -> Result<(), String> {
-    let resp = Request::delete(&format!("/api/runs/{}", id))
+    let resp = Request::delete(&api_url(&format!("/runs/{}", id)))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -125,8 +127,24 @@ fn url_encode(s: &str) -> String {
 
 // ─── Internal helpers ─────────────────────────────────────────────
 
+/// Build a full API URL from a path like `/jobs/123`.
+///
+/// Prepends the `/api` prefix and the configured API base URL (if any).
+/// For local dev with Trunk proxy, `api_base_url()` returns `""`,
+/// so `/api/jobs/123` — a relative path proxied by Trunk.
+/// For JAMstack production, the base URL is something like
+/// `"https://api.example.com"`, producing `"https://api.example.com/api/jobs/123"`.
+fn api_url(path: &str) -> String {
+    let base = api_base_url();
+    if base.is_empty() {
+        format!("/api{}", path)
+    } else {
+        format!("{}/api{}", base, path)
+    }
+}
+
 async fn api_get<T: DeserializeOwned>(path: &str) -> Result<T, String> {
-    let resp = Request::get(&format!("/api{}", path))
+    let resp = Request::get(&api_url(path))
         .send()
         .await
         .map_err(|e| format!("Network error: {}", e))?;
@@ -147,7 +165,7 @@ async fn api_get<T: DeserializeOwned>(path: &str) -> Result<T, String> {
 async fn api_post<T: serde::Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
     let body_str = serde_json::to_string(body).map_err(|e| format!("Serialize error: {}", e))?;
 
-    let resp = Request::post(&format!("/api{}", path))
+    let resp = Request::post(&api_url(path))
         .header("Content-Type", "application/json")
         .body(&body_str)
         .map_err(|e| format!("Request error: {}", e))?
@@ -171,7 +189,7 @@ async fn api_post<T: serde::Serialize, R: DeserializeOwned>(path: &str, body: &T
 async fn api_patch<T: serde::Serialize, R: DeserializeOwned>(path: &str, body: &T) -> Result<R, String> {
     let body_str = serde_json::to_string(body).map_err(|e| format!("Serialize error: {}", e))?;
 
-    let resp = Request::patch(&format!("/api{}", path))
+    let resp = Request::patch(&api_url(path))
         .header("Content-Type", "application/json")
         .body(&body_str)
         .map_err(|e| format!("Request error: {}", e))?

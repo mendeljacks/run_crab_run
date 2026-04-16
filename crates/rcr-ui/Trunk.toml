@@ -1,5 +1,5 @@
 [build]
-dist = "../../static"
+dist = "dist"
 
 [[proxy]]
 backend = "http://localhost:3001/api"

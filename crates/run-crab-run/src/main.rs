@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
         executor,
     };
 
-    let app = rcr_api::routes::router(state);
+    let app = rcr_api::routes::router(state, &config.server);
 
     let listener = tokio::net::TcpListener::bind(
         format!("{}:{}", config.server.host, config.server.port)

@@ -12,6 +12,8 @@ pub struct AppConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    #[serde(default)]
+    pub cors_origins: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +36,7 @@ impl Default for AppConfig {
             server: ServerConfig {
                 host: "0.0.0.0".into(),
                 port: 3000,
+                cors_origins: vec!["http://localhost:8080".into()],
             },
             database: DatabaseConfig {
                 path: "run_crab_run.db".into(),
