@@ -3,11 +3,16 @@ name = "rcr-runner"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "rcr-runner"
+path = "src/main.rs"
+
 [dependencies]
 rcr-core = { path = "../rcr-core" }
 rcr-db = { path = "../rcr-db" }
 tokio = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 sysinfo = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }

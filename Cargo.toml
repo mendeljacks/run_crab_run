@@ -5,7 +5,6 @@ members = [
     "crates/rcr-runner",
     "crates/rcr-api",
     "crates/rcr-ui",
-    "crates/run-crab-run",
 ]
 resolver = "2"
 
@@ -32,4 +31,3 @@ hex = "0.4"
 futures = "0.3"
 async-stream = "0.3"
 tokio-stream = "0.1"
-toml = "0.8"
