@@ -5,7 +5,7 @@ use rcr_core::models::run::{RunStatus, RunsFilter, RunSummary};
 use crate::api;
 use crate::util::*;
 
-const PAGE_SIZE: i64 = 25;
+const PAGE_SIZE: i64 = 50;
 
 #[component]
 pub fn RunsPage() -> impl IntoView {
@@ -15,8 +15,8 @@ pub fn RunsPage() -> impl IntoView {
     let (page, set_page) = signal(0i64);
     let (search, set_search) = signal(String::new());
     let (status_filter, set_status_filter) = signal(String::new());
-    let (sort_by, _set_sort_by) = signal(String::from("started_at"));
     let (sort_order, set_sort_order) = signal(String::from("desc"));
+    let (ready, set_ready) = signal(false);
 
     let search_params = web_sys::window()
         .and_then(|w| w.location().search().ok())
@@ -24,15 +24,15 @@ pub fn RunsPage() -> impl IntoView {
     let initial_job_id = extract_query_param(&search_params, "job_id");
     let (job_filter, set_job_filter) = signal(initial_job_id);
 
-    let fetch_runs = move || {
+    let do_fetch = move |pg: i64| {
         let filter = RunsFilter {
-            job_id: if job_filter.get().is_empty() { None } else { Some(job_filter.get()) },
-            status: if status_filter.get().is_empty() { None } else { parse_status(&status_filter.get()) },
-            search: if search.get().is_empty() { None } else { Some(search.get()) },
-            sort_by: if sort_by.get().is_empty() { None } else { Some(sort_by.get()) },
-            sort_order: if sort_order.get().is_empty() { None } else { Some(sort_order.get()) },
+            job_id: if job_filter.get_untracked().is_empty() { None } else { Some(job_filter.get_untracked()) },
+            status: if status_filter.get_untracked().is_empty() { None } else { parse_status(&status_filter.get_untracked()) },
+            search: if search.get_untracked().is_empty() { None } else { Some(search.get_untracked()) },
+            sort_by: Some("started_at".to_string()),
+            sort_order: if sort_order.get_untracked().is_empty() { None } else { Some(sort_order.get_untracked()) },
             limit: Some(PAGE_SIZE),
-            offset: Some(page.get() * PAGE_SIZE),
+            offset: Some(pg * PAGE_SIZE),
         };
         set_loading.set(true);
         set_error.set(None);
@@ -41,94 +41,19 @@ pub fn RunsPage() -> impl IntoView {
                 Ok(resp) => {
                     set_runs_data.set(Some((resp.runs, resp.total)));
                     set_loading.set(false);
+                    set_ready.set(true);
                 }
                 Err(e) => {
                     set_error.set(Some(e));
                     set_loading.set(false);
+                    set_ready.set(true);
                 }
             }
         });
     };
 
     // Initial fetch
-    spawn_local(async move {
-        let filter = RunsFilter {
-            job_id: if job_filter.get().is_empty() { None } else { Some(job_filter.get()) },
-            status: None,
-            search: None,
-            sort_by: Some("started_at".to_string()),
-            sort_order: Some("desc".to_string()),
-            limit: Some(PAGE_SIZE),
-            offset: Some(0),
-        };
-        match api::fetch_runs(&filter).await {
-            Ok(resp) => {
-                set_runs_data.set(Some((resp.runs, resp.total)));
-                set_loading.set(false);
-            }
-            Err(e) => {
-                set_error.set(Some(e));
-                set_loading.set(false);
-            }
-        }
-    });
-
-    // Live updates via SSE
-    let set_rd = set_runs_data;
-    spawn_local(async move {
-        use wasm_bindgen::prelude::*;
-        use wasm_bindgen::JsCast;
-
-        let es = match web_sys::EventSource::new(&crate::config::sse_url("/events/runs")) {
-            Ok(es) => es,
-            Err(_) => return,
-        };
-
-        // When we receive "recent" events, replace the entire list
-        let on_recent = Closure::<dyn Fn(_)>::new(move |evt: web_sys::MessageEvent| {
-            if let Some(text) = evt.data().as_string() {
-                if let Ok(runs) = serde_json::from_str::<Vec<RunSummary>>(&text) {
-                    set_rd.update(|current| {
-                        if let Some((_, total)) = current {
-                            *current = Some((runs, *total));
-                        } else {
-                            *current = Some((runs, 0));
-                        }
-                    });
-                }
-            }
-        });
-        es.add_event_listener_with_callback("recent", on_recent.as_ref().unchecked_ref())
-            .unwrap();
-        on_recent.forget();
-
-        // "running" events update running statuses in place
-        let on_running = Closure::<dyn Fn(_)>::new(move |evt: web_sys::MessageEvent| {
-            if let Some(text) = evt.data().as_string() {
-                if let Ok(running) = serde_json::from_str::<Vec<RunSummary>>(&text) {
-                    set_rd.update(|current| {
-                        if let Some((ref mut runs, _)) = current {
-                            // Mark any previously-running run not in the running list as needing refresh
-                            for rr in &running {
-                                if let Some(existing) = runs.iter_mut().find(|r| r.id == rr.id) {
-                                    *existing = rr.clone();
-                                }
-                            }
-                            // Prepend new running runs
-                            for rr in &running {
-                                if !runs.iter().any(|r| r.id == rr.id) {
-                                    runs.insert(0, rr.clone());
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-        });
-        es.add_event_listener_with_callback("running", on_running.as_ref().unchecked_ref())
-            .unwrap();
-        on_running.forget();
-    });
+    do_fetch(0);
 
     let total_pages = move || {
         runs_data.get()
@@ -174,14 +99,12 @@ pub fn RunsPage() -> impl IntoView {
                     <option value="asc">"Oldest first"</option>
                 </select>
                 <button class="btn btn-primary btn-sm" on:click=move |_| {
-                    fetch_runs();
+                    if ready.get_untracked() { set_page.set(0); do_fetch(0); }
                 }>"Apply"</button>
                 {move || if !job_filter.get().is_empty() {
                     view! {
                         <button class="btn btn-default btn-sm" on:click=move |_| {
-                            set_job_filter.set(String::new());
-                            set_page.set(0);
-                            fetch_runs();
+                            if ready.get_untracked() { set_job_filter.set(String::new()); set_page.set(0); do_fetch(0); }
                         }>"Clear Job Filter"</button>
                     }.into_any()
                 } else {
@@ -227,7 +150,9 @@ pub fn RunsPage() -> impl IntoView {
                                             };
                                             view! {
                                                 <tr class="clickable" on:click=move |_| {
-                                                    let _ = web_sys::window().unwrap().location().set_href(&format!("/runs/{}", rid));
+                                                    if ready.get_untracked() {
+                                                        let _ = web_sys::window().unwrap().location().set_href(&format!("/runs/{}", rid));
+                                                    }
                                                 }>
                                                     <td><code>{short_id(&run.id)}</code></td>
                                                     <td>{run.job_name.clone()}</td>
@@ -246,8 +171,11 @@ pub fn RunsPage() -> impl IntoView {
                                 <button class="btn btn-default btn-sm"
                                     disabled=move || page.get() == 0
                                     on:click=move |_| {
-                                        set_page.update(|p| *p = (*p).saturating_sub(1));
-                                        fetch_runs();
+                                        if ready.get_untracked() {
+                                            let prev = page.get_untracked().saturating_sub(1);
+                                            set_page.set(prev);
+                                            do_fetch(prev);
+                                        }
                                     }
                                 >"← Prev"</button>
                                 <span class="page-info">
@@ -256,8 +184,11 @@ pub fn RunsPage() -> impl IntoView {
                                 <button class="btn btn-default btn-sm"
                                     disabled=move || page.get() >= tp - 1
                                     on:click=move |_| {
-                                        set_page.update(|p| *p += 1);
-                                        fetch_runs();
+                                        if ready.get_untracked() {
+                                            let next = page.get_untracked() + 1;
+                                            set_page.set(next);
+                                            do_fetch(next);
+                                        }
                                     }
                                 >"Next →"</button>
                             </div>

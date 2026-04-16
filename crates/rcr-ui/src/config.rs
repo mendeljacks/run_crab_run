@@ -22,16 +22,3 @@ pub fn api_base_url() -> String {
         .and_then(|v: wasm_bindgen::JsValue| v.as_string())
         .unwrap_or_default()
 }
-
-/// Build a full URL for an SSE endpoint like `/api/events/runs`.
-///
-/// Handles the same base URL logic as `api.rs::api_url`, but for
-/// EventSource URLs which need a single string rather than a Request builder.
-pub fn sse_url(path: &str) -> String {
-    let base = api_base_url();
-    if base.is_empty() {
-        format!("/api{}", path)
-    } else {
-        format!("{}/api{}", base, path)
-    }
-}

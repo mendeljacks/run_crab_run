@@ -9,7 +9,6 @@ use axum::{
 use tower_http::trace::TraceLayer;
 use tower_http::cors::CorsLayer;
 
-use crate::sse;
 use crate::state::AppState;
 
 pub fn router(state: AppState) -> Router {
@@ -19,8 +18,6 @@ pub fn router(state: AppState) -> Router {
         .route("/runs", get(runs::list_runs))
         .route("/runs/{id}", get(runs::get_run).delete(runs::cancel_run))
         .route("/jobs/{id}/trigger", post(trigger::trigger_job))
-
-        .route("/events/runs", get(sse::run_events))
         .with_state(state.clone());
 
     Router::new()

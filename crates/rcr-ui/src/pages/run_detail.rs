@@ -8,7 +8,6 @@ use crate::util::*;
 
 #[component]
 pub fn RunDetailPage() -> impl IntoView {
-    // Extract run ID from the URL path: /runs/{id}
     let params = use_params_map();
     let run_id = params.with(|p| p.get("id").unwrap_or_default());
 
@@ -25,27 +24,6 @@ pub fn RunDetailPage() -> impl IntoView {
         }
         set_loading.set(false);
     });
-
-    // Auto-refresh every 3s while running
-    {
-        let run_id_poll = run_id.clone();
-        let set_run = set_run;
-        spawn_local(async move {
-            loop {
-                gloo_timers::future::TimeoutFuture::new(3000).await;
-                match api::fetch_run(&run_id_poll).await {
-                    Ok(r) => {
-                        let is_running = r.status == rcr_core::models::RunStatus::Running;
-                        set_run.set(Some(r));
-                        if !is_running {
-                            break;
-                        }
-                    }
-                    Err(_) => break,
-                }
-            }
-        });
-    }
 
     view! {
         <div class="view">
@@ -66,16 +44,6 @@ pub fn RunDetailPage() -> impl IntoView {
                             <h1>{format!("Run {}", short_id(&r.id))}</h1>
                             <span class=status_class>{status_text}</span>
                         </div>
-
-                        {if is_running {
-                            view! {
-                                <div class="alert alert-info">
-                                    <strong>"↻ Running…"</strong>" This job is currently executing. Page auto-refreshes."
-                                </div>
-                            }.into_any()
-                        } else {
-                            view! { <div></div> }.into_any()
-                        }}
 
                         <div class="detail-grid">
                             <div class="detail-fact">
@@ -148,11 +116,6 @@ pub fn RunDetailPage() -> impl IntoView {
                                         let id = run_id_for_cancel.clone();
                                         spawn_local(async move {
                                             let _ = api::cancel_run(&id).await;
-                                            // Refresh to see updated status
-                                            match api::fetch_run(&id).await {
-                                                Ok(updated) => set_run.set(Some(updated)),
-                                                Err(_) => {}
-                                            }
                                         });
                                     }>"✕ Cancel Run"</button>
                                 }.into_any()

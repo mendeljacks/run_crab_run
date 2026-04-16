@@ -158,8 +158,8 @@ impl Database {
             where_str, sort_col, sort_dir
         );
 
-        let limit = filter.limit.unwrap_or(50);
         let offset = filter.offset.unwrap_or(0);
+        let limit = filter.limit.unwrap_or(50);
 
         let data_sql = format!("{} LIMIT ? OFFSET ?", data_sql);
 
