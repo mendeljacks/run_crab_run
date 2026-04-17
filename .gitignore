@@ -1,16 +1,64 @@
+# Project
 /target/
-*.db
-*.db-shm
-*.db-wal
-.env
-.env.*
-!.env.example
-.idea/
-.vscode/
-*.swp
-*.swo
+.pi
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+# Rust
+**/target/
+**/*.rs.bk
+*.pdb
+
+# Node
+node_modules/
+dist/
+.next
+out
+.nuxt
+.svelte-kit
+.docusaurus
+*.tsbuildinfo
+
+# .NET
+**/bin/
+**/obj/
+
+# C/C++
+build/
+build_*/
+CMakeCache.txt
+CMakeFiles/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.local
+
+# Logs
 *.log
-/crates/rcr-ui/dist/
-.pi
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# SpacetimeDB
+.spacetime/
+.spacetime_token
+**/module_bindings/
+spacetime.local.json
+
+# SpacetimeDB runtime data
+backend/generated/
