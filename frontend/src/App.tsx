@@ -52,7 +52,8 @@ const App = observer(() => {
                         sx={{ fontWeight: 700, mr: 4, cursor: 'pointer' }}
                         onClick={() => navigateTo('dashboard')}
                     >
-                        🦀 Run Crab Run
+                        <img src="/crab.svg" alt="" style={{ width: 56, height: 56, marginRight: 8, verticalAlign: 'middle' }} />
+                        Run Crab Run
                     </Typography>
                     {NAV_ITEMS.map(item => (
                         <Button

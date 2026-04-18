@@ -1,22 +1,23 @@
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchSql } from '../../helpers/api'
+import { fetchSql, stdbToTimestamp, stdbToOptionTimestamp, stdbToRunStatus, stdbToOption } from '../../helpers/api'
 import type { Run, RunStatus } from '../../stores/types'
 
 export const fetchRunById = async (id: string): Promise<void> => {
     runInAction(() => { store.runs.loading = true })
     try {
         const query = `SELECT id, job_id, terminal_output, status, started_at, finished_at, created_at, updated_at FROM runs WHERE id = '${id}'`
-        const runs = await fetchSql(query, (row) => {
+        const runs = await fetchSql(query, (row, columns) => {
+            const col = (name: string) => row[columns.indexOf(name)]
             return {
-                id: row[0] as string,
-                job_id: row[1] as string,
-                terminal_output: row[2] as string | null,
-                status: row[3] as RunStatus,
-                started_at: row[4] as number,
-                finished_at: row[5] as number | null,
-                created_at: row[6] as number,
-                updated_at: row[7] as number
+                id: col('id') as string,
+                job_id: col('job_id') as string,
+                terminal_output: stdbToOption(col('terminal_output')),
+                status: stdbToRunStatus(col('status')),
+                started_at: stdbToTimestamp(col('started_at')),
+                finished_at: stdbToOptionTimestamp(col('finished_at')),
+                created_at: stdbToTimestamp(col('created_at')),
+                updated_at: stdbToTimestamp(col('updated_at'))
             } satisfies Run
         })
         runInAction(() => {
@@ -37,16 +38,17 @@ export const fetchRuns = async (jobId?: string): Promise<void> => {
     try {
         const whereClause = jobId ? ` WHERE job_id = '${jobId}'` : ''
         const query = `SELECT id, job_id, terminal_output, status, started_at, finished_at, created_at, updated_at FROM runs${whereClause} ORDER BY started_at DESC`
-        const runs = await fetchSql(query, (row) => {
+        const runs = await fetchSql(query, (row, columns) => {
+            const col = (name: string) => row[columns.indexOf(name)]
             return {
-                id: row[0] as string,
-                job_id: row[1] as string,
-                terminal_output: row[2] as string | null,
-                status: row[3] as RunStatus,
-                started_at: row[4] as number,
-                finished_at: row[5] as number | null,
-                created_at: row[6] as number,
-                updated_at: row[7] as number
+                id: col('id') as string,
+                job_id: col('job_id') as string,
+                terminal_output: stdbToOption(col('terminal_output')),
+                status: stdbToRunStatus(col('status')),
+                started_at: stdbToTimestamp(col('started_at')),
+                finished_at: stdbToOptionTimestamp(col('finished_at')),
+                created_at: stdbToTimestamp(col('created_at')),
+                updated_at: stdbToTimestamp(col('updated_at'))
             } satisfies Run
         })
         runInAction(() => {

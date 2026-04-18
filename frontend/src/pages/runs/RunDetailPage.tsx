@@ -6,7 +6,7 @@ import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
 import { fetchRuns, fetchRunById } from '../runs/helpers'
 import { fetchJobs } from '../jobs/helpers'
-import { shortId, formatDatetime, formatTimeAgo, statusColor, statusBgColor } from '../../helpers/format'
+import { shortId, formatDatetime, formatTimeAgo, formatElapsed, statusColor, statusBgColor } from '../../helpers/format'
 
 export const RunDetailPage = observer(() => {
     const runId = store.ui.runDetailId
@@ -28,7 +28,7 @@ export const RunDetailPage = observer(() => {
 
     const jobName = store.jobs.list.find(j => j.id === run.job_id)?.name ?? shortId(run.job_id)
     const durationMicros = run.finished_at ? run.finished_at - run.started_at : null
-    const durationStr = durationMicros != null ? formatDuration(durationMicros) : '—'
+    const durationStr = durationMicros != null ? formatElapsed(durationMicros) : '—'
 
     return (
         <Box>
@@ -65,13 +65,6 @@ export const RunDetailPage = observer(() => {
         </Box>
     )
 })
-
-const formatDuration = (micros: number): string => {
-    const ms = micros / 1000
-    if (ms < 1000) return `${Math.round(ms)}ms`
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
-    return `${(ms / 60000).toFixed(1)}m`
-}
 
 const DetailCard = ({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) => (
     <Paper sx={{ p: 2, borderRadius: 2, border: '1px solid #e2e8f0' }}>

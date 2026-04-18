@@ -1,18 +1,23 @@
-export const formatTimeAgo = (micros: number): string => {
-    const now = Date.now() * 1000
-    const diff = now - micros
-    const secs = Math.floor(diff / 1_000_000)
+import { format, formatDistanceToNow, intervalToDuration, formatDuration } from 'date-fns'
 
-    if (secs < 0) return 'just now'
-    if (secs < 60) return `${secs} second${secs === 1 ? '' : 's'} ago`
-    if (secs < 3600) return `${Math.floor(secs / 60)} minute${Math.floor(secs / 60) === 1 ? '' : 's'} ago`
-    if (secs < 86400) return `${Math.floor(secs / 3600)} hour${Math.floor(secs / 3600) === 1 ? '' : 's'} ago`
-    return `${Math.floor(secs / 86400)} day${Math.floor(secs / 86400) === 1 ? '' : 's'} ago`
+const microsToDate = (micros: number): Date => new Date(micros / 1000)
+
+export const formatTimeAgo = (micros: number): string => {
+    return formatDistanceToNow(microsToDate(micros), { addSuffix: true })
 }
 
 export const formatDatetime = (micros: number): string => {
+    return format(microsToDate(micros), 'yyyy-MM-dd HH:mm:ss')
+}
+
+export const formatElapsed = (micros: number): string => {
     const ms = micros / 1000
-    return new Date(ms).toISOString().replace('T', ' ').slice(0, 19)
+    const duration = intervalToDuration({ start: 0, end: ms })
+    // Show up to the two largest non-zero units
+    return formatDuration(duration, {
+        format: ['hours', 'minutes', 'seconds'],
+        zero: false,
+    })
 }
 
 export const shortId = (id: string): string => {

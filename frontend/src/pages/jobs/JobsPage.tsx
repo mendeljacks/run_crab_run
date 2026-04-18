@@ -6,7 +6,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchJobs, createJob, insertRun } from './helpers'
+import { fetchJobs, createJob, triggerRun, deleteJob } from './helpers'
 import { fetchRuns } from '../runs/helpers'
 import { formatSchedule, formatTimeAgo, shortId, statusColor, statusBgColor } from '../../helpers/format'
 import type { Job, Run, RunStatus } from '../../stores/types'
@@ -92,7 +92,7 @@ const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: Run[] }) => {
                                 {jobRuns.length > 0 ? <span>{jobRuns.length} total</span> : '—'}
                             </Box>
                             <Box component="td" sx={{ p: 1.5 }}>
-                                <Button variant="outlined" size="small" startIcon={<PlayArrowIcon fontSize="small" />} onClick={() => handleTriggerRun(job.id)} sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}>
+                                <Button variant="outlined" size="small" startIcon={<PlayArrowIcon fontSize="small" />} onClick={async () => { await triggerRun(job.id); fetchRuns() }} sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}>
                                     Run
                                 </Button>
                             </Box>
@@ -103,12 +103,6 @@ const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: Run[] }) => {
         </Box>
     )
 })
-
-const handleTriggerRun = async (jobId: string) => {
-    const nowMicros = Date.now() * 1000
-    await insertRun(jobId, 'Running', null, nowMicros, null)
-    fetchRuns()
-}
 
 const CreateJobDialog = observer(() => {
     const [name, setName] = useState('')

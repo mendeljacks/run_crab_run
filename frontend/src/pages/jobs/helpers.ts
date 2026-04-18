@@ -1,21 +1,22 @@
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchSql, callReducer } from '../../helpers/api'
+import { fetchSql, callReducer, runStatusToStdb, optionToStdb, timestampToStdb, stdbToTimestamp, stdbToOptionTimestamp, stdbToRunStatus, stdbToOption } from '../../helpers/api'
 import type { Job } from '../../stores/types'
 import { v4 as uuid } from 'uuid'
 
 export const fetchJobs = async (): Promise<void> => {
     runInAction(() => { store.jobs.loading = true })
     try {
-        const jobs = await fetchSql('SELECT id, name, command, schedule, enabled, created_at, updated_at FROM jobs', (row) => {
+        const jobs = await fetchSql('SELECT id, name, command, schedule, enabled, created_at, updated_at FROM jobs', (row, columns) => {
+            const col = (name: string) => row[columns.indexOf(name)]
             return {
-                id: row[0] as string,
-                name: row[1] as string,
-                command: row[2] as string,
-                schedule: row[3] as string | null,
-                enabled: row[4] as boolean,
-                created_at: row[5] as number,
-                updated_at: row[6] as number
+                id: col('id') as string,
+                name: col('name') as string,
+                command: col('command') as string,
+                schedule: stdbToOption(col('schedule')),
+                enabled: col('enabled') as boolean,
+                created_at: stdbToTimestamp(col('created_at')),
+                updated_at: stdbToTimestamp(col('updated_at'))
             } satisfies Job
         })
         runInAction(() => {
@@ -34,7 +35,13 @@ export const createJob = async (name: string, command: string, schedule: string 
     const id = uuid()
     runInAction(() => { store.jobs.error = '' })
     try {
-        await callReducer('insert_job', [id, name, command, schedule || null, enabled])
+        await callReducer('insert_job', [
+            id,
+            name,
+            command,
+            optionToStdb(schedule),
+            enabled
+        ])
         await fetchJobs()
     } catch (e) {
         runInAction(() => {
@@ -43,14 +50,68 @@ export const createJob = async (name: string, command: string, schedule: string 
     }
 }
 
-export const insertRun = async (jobId: string, status: 'Running' | 'Succeeded' | 'Failed', terminalOutput: string | null, startedAt: number, finishedAt: number | null): Promise<void> => {
+export const deleteJob = async (id: string): Promise<void> => {
+    try {
+        await callReducer('delete_job', [id])
+        await fetchJobs()
+    } catch (e) {
+        runInAction(() => {
+            store.jobs.error = String(e)
+        })
+    }
+}
+
+export const updateJob = async (id: string, updates: { name?: string; command?: string; schedule?: string | null; enabled?: boolean }): Promise<void> => {
+    runInAction(() => { store.jobs.error = '' })
+    try {
+        await callReducer('update_job', [
+            id,
+            updates.name ?? null,
+            updates.command ?? null,
+            // schedule: Option<Option<String>> in SpacetimeDB
+            // null = no change, {"some": {"some": "value"}} = set schedule, {"some": {"none": []}} = clear schedule
+            updates.schedule !== undefined
+                ? (updates.schedule === null ? { some: { none: [] } } : { some: { some: updates.schedule } })
+                : null,
+            updates.enabled ?? null
+        ])
+        await fetchJobs()
+    } catch (e) {
+        runInAction(() => {
+            store.jobs.error = String(e)
+        })
+    }
+}
+
+export const triggerRun = async (jobId: string): Promise<void> => {
     const id = uuid()
+    const nowMicros = Date.now() * 1000
     runInAction(() => { store.runs.error = '' })
     try {
-        await callReducer('insert_run', [id, jobId, terminalOutput, status, startedAt, finishedAt])
+        await callReducer('insert_run', [
+            id,
+            jobId,
+            { none: [] },  // terminal_output: None
+            { running: [] }, // status: Running
+            timestampToStdb(nowMicros),  // started_at
+            { none: [] }  // finished_at: None
+        ])
     } catch (e) {
         runInAction(() => {
             store.runs.error = String(e)
         })
     }
 }
+
+export const deleteRun = async (id: string): Promise<void> => {
+    try {
+        await callReducer('delete_run', [id])
+        await fetchRuns()
+    } catch (e) {
+        runInAction(() => {
+            store.runs.error = String(e)
+        })
+    }
+}
+
+import { fetchRuns } from '../runs/helpers'
