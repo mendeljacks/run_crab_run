@@ -37,7 +37,7 @@ export const fetchRuns = async (jobId?: string): Promise<void> => {
     runInAction(() => { store.runs.loading = true })
     try {
         const whereClause = jobId ? ` WHERE job_id = '${jobId}'` : ''
-        const query = `SELECT id, job_id, terminal_output, status, started_at, finished_at, created_at, updated_at FROM runs${whereClause} ORDER BY started_at DESC`
+        const query = `SELECT id, job_id, terminal_output, status, started_at, finished_at, created_at, updated_at FROM runs${whereClause}`
         const runs = await fetchSql(query, (row, columns) => {
             const col = (name: string) => row[columns.indexOf(name)]
             return {
@@ -51,6 +51,8 @@ export const fetchRuns = async (jobId?: string): Promise<void> => {
                 updated_at: stdbToTimestamp(col('updated_at'))
             } satisfies Run
         })
+        // Sort client-side since SpacetimeDB SQL doesn't support ORDER BY
+        runs.sort((a, b) => b.started_at - a.started_at)
         runInAction(() => {
             store.runs.list = runs
             store.runs.loading = false
