@@ -7,8 +7,8 @@ import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
 import { fetchRuns } from '../runs/helpers'
 import { fetchJobs } from '../jobs/helpers'
-import { shortId, formatTimeAgo, formatDatetime, statusColor, statusBgColor } from '../../helpers/format'
-import type { Run, RunStatus } from '../../stores/types'
+import { shortId, formatTimeAgo, statusColor, statusBgColor } from '../../helpers/format'
+import type { Run } from '../../stores/types'
 import { useState } from 'react'
 
 export const RunsPage = observer(() => {
@@ -58,10 +58,12 @@ export const RunsPage = observer(() => {
                     placeholder="Search by job name or ID…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
-                        )
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
+                            )
+                        }
                     }}
                     sx={{ minWidth: 260 }}
                 />

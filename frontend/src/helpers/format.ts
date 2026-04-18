@@ -1,13 +1,16 @@
 import { format, formatDistanceToNow, intervalToDuration, formatDuration } from 'date-fns'
 
-const microsToDate = (micros: number): Date => new Date(micros / 1000)
-
-export const formatTimeAgo = (micros: number): string => {
-    return formatDistanceToNow(microsToDate(micros), { addSuffix: true })
+const isoToDate = (iso: string | number): Date => {
+    if (typeof iso === 'number') return new Date(iso / 1000) // Legacy microsecond support
+    return new Date(iso)
 }
 
-export const formatDatetime = (micros: number): string => {
-    return format(microsToDate(micros), 'yyyy-MM-dd HH:mm:ss')
+export const formatTimeAgo = (timestamp: string | number): string => {
+    return formatDistanceToNow(isoToDate(timestamp), { addSuffix: true })
+}
+
+export const formatDatetime = (timestamp: string | number): string => {
+    return format(isoToDate(timestamp), 'yyyy-MM-dd HH:mm:ss')
 }
 
 export const formatElapsed = (micros: number): string => {
@@ -18,6 +21,11 @@ export const formatElapsed = (micros: number): string => {
         format: ['hours', 'minutes', 'seconds'],
         zero: false,
     })
+}
+
+/** Compute elapsed microseconds between two ISO timestamps */
+export const elapsedMicros = (start: string, end: string): number => {
+    return (new Date(end).getTime() - new Date(start).getTime()) * 1000
 }
 
 export const shortId = (id: string): string => {

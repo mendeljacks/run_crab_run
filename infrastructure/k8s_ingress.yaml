@@ -1,0 +1,106 @@
+# Ingress routes for run-crab-run.example.com
+# Cloudflare proxy handles TLS termination
+# run-crab-run.example.com / -> frontend (port 80)
+# run-crab-run.example.com /api/* -> backend (port 4000)
+# run-crab-run.example.com /supabase/auth/v1/ -> supabase-auth GoTrue (port 9999) - strips prefix
+# studio.run-crab-run.example.com / -> supabase-studio (port 3000)
+---
+# Backend API ingress (higher priority than frontend catch-all)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rcr-backend-ingress
+  namespace: run-crab-run
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: run-crab-run.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /api
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 4000
+---
+# Frontend ingress (catch-all, lowest priority)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rcr-frontend-ingress
+  namespace: run-crab-run
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: run-crab-run.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+---
+# Supabase Auth (GoTrue) ingress - strips /supabase/auth/v1 prefix
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rcr-supabase-auth-ingress
+  namespace: run-crab-run
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: run-crab-run.example.com
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            path: /supabase/auth/v1(/|$)(.*)
+            backend:
+              service:
+                name: supabase-auth
+                port:
+                  number: 9999
+---
+# Supabase Studio ingress (separate subdomain, basic auth protected)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rcr-supabase-studio-ingress
+  namespace: run-crab-run
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: studio-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Run Crab Run Studio"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: studio.run-crab-run.example.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: supabase-studio
+                port:
+                  number: 3000

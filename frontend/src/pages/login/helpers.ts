@@ -1,24 +1,36 @@
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-
-const getApiBase = (): string => {
-    const globalBase = (window as any).__API_BASE_URL__ as string | undefined
-    if (globalBase) return globalBase
-    return '/api'
-}
+import { supabase } from '../../config/supabase'
 
 export const authenticate = async (): Promise<void> => {
     runInAction(() => { store.auth.loading = true })
     try {
-        const savedToken = localStorage.getItem('stdb_token')
-        if (savedToken) {
+        // Check for existing session
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.access_token) {
             runInAction(() => {
-                store.auth.token = savedToken
+                store.auth.token = session.access_token
                 store.auth.loading = false
             })
             return
         }
-        await requestNewToken()
+
+        // Try to restore from localStorage (Supabase persists sessions)
+        const { data: { session: restoredSession } } = await supabase.auth.getSession()
+        if (restoredSession?.access_token) {
+            runInAction(() => {
+                store.auth.token = restoredSession.access_token
+                store.auth.loading = false
+            })
+            return
+        }
+
+        // No existing session — user needs to sign in
+        runInAction(() => {
+            store.auth.loading = false
+            store.auth.token = ''
+        })
     } catch (e) {
         runInAction(() => {
             store.auth.loading = false
@@ -27,27 +39,21 @@ export const authenticate = async (): Promise<void> => {
     }
 }
 
-export const requestNewToken = async (): Promise<void> => {
+export const signInAnonymously = async (): Promise<void> => {
     runInAction(() => { store.auth.loading = true })
     try {
-        const res = await fetch(`${getApiBase()}/v1/identity`, {
-            method: 'POST'
-        })
+        const { data, error } = await supabase.auth.signInAnonymously()
 
-        if (!res.ok) {
-            throw new Error(`Auth failed: ${res.status}`)
+        if (error) {
+            throw error
         }
 
-        const data = await res.json()
-        const token = data.token as string
-
-        if (!token) {
-            throw new Error('No token in response')
+        if (!data.session?.access_token) {
+            throw new Error('No session returned from anonymous sign-in')
         }
 
-        localStorage.setItem('stdb_token', token)
         runInAction(() => {
-            store.auth.token = token
+            store.auth.token = data.session!.access_token
             store.auth.loading = false
         })
     } catch (e) {
@@ -57,4 +63,11 @@ export const requestNewToken = async (): Promise<void> => {
         })
         throw e
     }
+}
+
+export const signOut = async (): Promise<void> => {
+    await supabase.auth.signOut()
+    runInAction(() => {
+        store.auth.token = ''
+    })
 }

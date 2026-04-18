@@ -1,0 +1,362 @@
+# Supabase on Kubernetes for Run Crab Run
+# This deploys: Postgres, GoTrue (auth), PostgREST (internal, for Studio), Postgres-Meta, Studio
+# Kong is not needed - ingress routes directly to GoTrue
+---
+# Postgres Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-db
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-db
+  template:
+    metadata:
+      labels:
+        app: supabase-db
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: postgres
+          image: supabase/postgres:15.8.1.060
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "postgres"
+          ports:
+            - containerPort: 5432
+          resources:
+            limits:
+              memory: "1024Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: supabase-db-data
+              subPath: pgdata
+      volumes:
+        - name: supabase-db-data
+          persistentVolumeClaim:
+            claimName: supabase-db-pvc
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-db
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: supabase-db
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: supabase-db-pvc
+  namespace: run-crab-run
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# GoTrue (Auth)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-auth
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-auth
+  template:
+    metadata:
+      labels:
+        app: supabase-auth
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: gotrue
+          image: supabase/gotrue:v2.170.0
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: POSTGRES_PASSWORD
+            - name: GOTRUE_API_HOST
+              value: "0.0.0.0"
+            - name: GOTRUE_API_PORT
+              value: "9999"
+            - name: API_EXTERNAL_URL
+              value: "https://run-crab-run.example.com/supabase/auth/v1"
+            - name: GOTRUE_DB_DRIVER
+              value: "postgres"
+            - name: GOTRUE_DB_DATABASE_URL
+              value: "postgres://supabase_auth_admin:$(POSTGRES_PASSWORD)@supabase-db.run-crab-run.svc.cluster.local:5432/postgres"
+            - name: GOTRUE_SITE_URL
+              value: "https://run-crab-run.example.com"
+            - name: GOTRUE_URI_ALLOW_LIST
+              value: "https://run-crab-run.example.com/**,http://localhost:3000/**"
+            - name: GOTRUE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: JWT_SECRET
+            - name: GOTRUE_JWT_EXP
+              value: "3600"
+            - name: GOTRUE_JWT_DEFAULT_GROUP_NAME
+              value: "authenticated"
+            - name: GOTRUE_EXTERNAL_EMAIL_ENABLED
+              value: "true"
+            - name: GOTRUE_MAILER_AUTOCONFIRM
+              value: "true"
+            - name: GOTRUE_DISABLE_SIGNUP
+              value: "false"
+          ports:
+            - containerPort: 9999
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-auth
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 9999
+      targetPort: 9999
+  selector:
+    app: supabase-auth
+---
+# PostgREST (API)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-rest
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-rest
+  template:
+    metadata:
+      labels:
+        app: supabase-rest
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: postgrest
+          image: postgrest/postgrest:v12.2.3
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: POSTGRES_PASSWORD
+            - name: PGRST_DB_URI
+              value: "postgres://authenticator:$(POSTGRES_PASSWORD)@supabase-db.run-crab-run.svc.cluster.local:5432/postgres"
+            - name: PGRST_DB_SCHEMAS
+              value: "public,storage,graphql_public"
+            - name: PGRST_DB_ANON_ROLE
+              value: "anon"
+            - name: PGRST_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: JWT_SECRET
+            - name: PGRST_DB_USE_LEGACY_GUCS
+              value: "false"
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-rest
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: supabase-rest
+---
+# Postgres-Meta (database introspection API for Studio)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-meta
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-meta
+  template:
+    metadata:
+      labels:
+        app: supabase-meta
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: postgres-meta
+          image: supabase/postgres-meta:v0.84.2
+          env:
+            - name: PG_META_PORT
+              value: "8080"
+            - name: PG_META_DB_HOST
+              value: "supabase-db.run-crab-run.svc.cluster.local"
+            - name: PG_META_DB_PORT
+              value: "5432"
+            - name: PG_META_DB_NAME
+              value: "postgres"
+            - name: PG_META_DB_USER
+              value: "supabase_admin"
+            - name: PG_META_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: POSTGRES_PASSWORD
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-meta
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: supabase-meta
+---
+# Supabase Studio (database UI)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-studio
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-studio
+  template:
+    metadata:
+      labels:
+        app: supabase-studio
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: studio
+          image: supabase/studio:latest
+          env:
+            - name: STUDIO_DEFAULT_ORGANIZATION
+              value: "run-crab-run"
+            - name: STUDIO_DEFAULT_PROJECT
+              value: "run-crab-run"
+            - name: STUDIO_PORT
+              value: "3000"
+            - name: SUPABASE_URL
+              value: "http://supabase-rest.run-crab-run.svc.cluster.local:3000"
+            - name: SUPABASE_PUBLIC_URL
+              value: "https://run-crab-run.example.com/supabase"
+            - name: NEXT_PUBLIC_SUPABASE_URL
+              value: "https://run-crab-run.example.com/supabase"
+            - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: ANON_KEY
+            - name: SUPABASE_SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: SERVICE_ROLE_KEY
+            - name: STUDIO_PG_META_URL
+              value: "http://supabase-meta.run-crab-run.svc.cluster.local:8080"
+            - name: POSTGRES_HOST
+              value: "supabase-db.run-crab-run.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: POSTGRES_PASSWORD
+            - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
+              value: "/tmp/edge-functions"
+            - name: NEXT_ANALYTICS_BACKEND_PROVIDER
+              value: ""
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-studio
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: supabase-studio

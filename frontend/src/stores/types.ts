@@ -6,8 +6,8 @@ export interface Job {
     command: string
     schedule: string | null
     enabled: boolean
-    created_at: number
-    updated_at: number
+    created_at: string
+    updated_at: string
 }
 
 export interface Run {
@@ -15,33 +15,8 @@ export interface Run {
     job_id: string
     terminal_output: string | null
     status: RunStatus
-    started_at: number
-    finished_at: number | null
-    created_at: number
-    updated_at: number
-}
-
-export interface SqlResult {
-    schema: {
-        elements: Array<{
-            name: { some: string }
-            algebraic_type: unknown
-        }>
-    }
-    rows: unknown[][]
-    total_duration_micros: number
-    stats: {
-        rows_inserted: number
-        rows_deleted: number
-        rows_updated: number
-    }
-}
-
-export interface JobsResponse {
-    jobs: Job[]
-}
-
-export interface RunsResponse {
-    runs: Run[]
-    total: number
+    started_at: string
+    finished_at: string | null
+    created_at: string
+    updated_at: string
 }

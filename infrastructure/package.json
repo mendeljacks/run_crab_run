@@ -1,0 +1,12 @@
+{
+    "name": "run-crab-run-infrastructure",
+    "version": "1.0.0",
+    "description": "Infrastructure and deployment for Run Crab Run",
+    "scripts": {
+        "deploy": "npx tsx deploy.ts"
+    },
+    "dependencies": {
+        "picocolors": "^1.1.0",
+        "tsx": "^4.19.0"
+    }
+}

@@ -6,7 +6,7 @@ import { store } from '../../stores/root_store'
 import { fetchJobs } from '../jobs/helpers'
 import { fetchRuns } from '../runs/helpers'
 import { statusColor, statusBgColor, formatTimeAgo, shortId } from '../../helpers/format'
-import type { Run, RunStatus } from '../../stores/types'
+import type { Run } from '../../stores/types'
 
 export const DashboardPage = observer(() => {
     useEffect(() => {

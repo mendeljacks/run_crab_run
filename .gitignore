@@ -1,5 +1,3 @@
-# Project
-/target/
 .pi
 
 # OS files
@@ -15,9 +13,7 @@ Thumbs.db
 !.vscode/extensions.json
 .history/
 
-# Rust
-**/target/
-**/*.rs.bk
+# Build artifacts
 *.pdb
 
 # Node
@@ -54,11 +50,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# SpacetimeDB
-.spacetime/
-.spacetime_token
-**/module_bindings/
-spacetime.local.json
+# Supabase
+.supabase/
 
-# SpacetimeDB runtime data
-backend/generated/
+# Backend
+backend/node_modules/
+backend/dist/
+backend/.env
+backend/.env.local
+
+# Infrastructure
+infrastructure/node_modules/
+infrastructure/.env

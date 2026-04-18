@@ -4,9 +4,9 @@ import { Box, Typography, Paper, Chip, Button, CircularProgress } from '@mui/mat
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchRuns, fetchRunById } from '../runs/helpers'
+import { fetchRunById } from '../runs/helpers'
 import { fetchJobs } from '../jobs/helpers'
-import { shortId, formatDatetime, formatTimeAgo, formatElapsed, statusColor, statusBgColor } from '../../helpers/format'
+import { shortId, formatDatetime, formatElapsed, elapsedMicros, statusColor, statusBgColor } from '../../helpers/format'
 
 export const RunDetailPage = observer(() => {
     const runId = store.ui.runDetailId
@@ -27,7 +27,7 @@ export const RunDetailPage = observer(() => {
     }
 
     const jobName = store.jobs.list.find(j => j.id === run.job_id)?.name ?? shortId(run.job_id)
-    const durationMicros = run.finished_at ? run.finished_at - run.started_at : null
+    const durationMicros = run.finished_at ? elapsedMicros(run.started_at, run.finished_at) : null
     const durationStr = durationMicros != null ? formatElapsed(durationMicros) : '—'
 
     return (

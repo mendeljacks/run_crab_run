@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite'
 import { Box, Button, Typography, Paper, CircularProgress } from '@mui/material'
 import { store } from '../../stores/root_store'
-import { requestNewToken } from './helpers'
+import { signInAnonymously } from './helpers'
 
 export const LoginPage = observer(() => {
     return (
@@ -17,7 +17,7 @@ export const LoginPage = observer(() => {
                     🦀 Run Crab Run
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                    Job runner dashboard powered by SpacetimeDB
+                    Job runner dashboard powered by Supabase
                 </Typography>
 
                 {store.auth.loading ? (
@@ -26,10 +26,10 @@ export const LoginPage = observer(() => {
                     <Button
                         variant="contained"
                         size="large"
-                        onClick={() => requestNewToken()}
+                        onClick={() => signInAnonymously()}
                         sx={{ textTransform: 'none', borderRadius: 2, px: 4 }}
                     >
-                        Connect to SpacetimeDB
+                        Sign In Anonymously
                     </Button>
                 )}
 

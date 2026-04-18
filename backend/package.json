@@ -1,0 +1,34 @@
+{
+    "name": "run-crab-run-backend",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "tsx watch --inspect=0.0.0.0:9229 --env-file=.env src/server.ts",
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "dependencies": {
+        "cors": "^2.8.6",
+        "express": "^5.1.0",
+        "jose": "^6.2.2",
+        "postgres": "^3.4.5"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.0",
+
+        "@types/node": "^22.15.0",
+        "eslint": "^10.0.3",
+        "eslint-config-prettier": "^10.1.8",
+        "globals": "^17.4.0",
+        "prettier": "^3.8.1",
+        "tsx": "^4.19.0",
+        "typescript": "~5.9.3",
+        "typescript-eslint": "^8.57.1"
+    }
+}

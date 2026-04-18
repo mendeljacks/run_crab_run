@@ -1,9 +1,10 @@
 import { observer } from 'mobx-react-lite'
 import { useEffect } from 'react'
 import { CssBaseline, Box, AppBar, Toolbar, Typography, Button, CircularProgress } from '@mui/material'
+import LogoutIcon from '@mui/icons-material/Logout'
 import { runInAction } from 'mobx'
 import { store } from './stores/root_store'
-import { authenticate } from './pages/login/helpers'
+import { authenticate, signOut } from './pages/login/helpers'
 import { LoginPage } from './pages/login/LoginPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { JobsPage } from './pages/jobs/JobsPage'
@@ -71,6 +72,14 @@ const App = observer(() => {
                             {item.label}
                         </Button>
                     ))}
+                    <Box sx={{ flex: 1 }} />
+                    <Button
+                        onClick={() => signOut()}
+                        startIcon={<LogoutIcon />}
+                        sx={{ textTransform: 'none', color: '#94a3b8' }}
+                    >
+                        Sign Out
+                    </Button>
                 </Toolbar>
             </AppBar>
             <Box sx={{ p: 3 }}>

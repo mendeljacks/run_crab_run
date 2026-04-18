@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: backend
+          image: registry.no3rd.com/run-crab-run-backend:latest
+          env:
+            - name: PORT
+              value: "4000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: JWT_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rcr-env
+                  key: DATABASE_URL
+            - name: SUPABASE_URL
+              value: "https://run-crab-run.example.com/supabase"
+          ports:
+            - containerPort: 4000
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: private-registry
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 4000
+      targetPort: 4000
+  selector:
+    app: backend

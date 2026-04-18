@@ -6,10 +6,10 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchJobs, createJob, triggerRun, deleteJob } from './helpers'
+import { fetchJobs, createJob, triggerRun } from './helpers'
 import { fetchRuns } from '../runs/helpers'
-import { formatSchedule, formatTimeAgo, shortId, statusColor, statusBgColor } from '../../helpers/format'
-import type { Job, Run, RunStatus } from '../../stores/types'
+import { formatSchedule } from '../../helpers/format'
+import type { Job, Run } from '../../stores/types'
 
 export const JobsPage = observer(() => {
     useEffect(() => {
@@ -76,7 +76,6 @@ const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: Run[] }) => {
                 {jobs.map(job => {
                     const jobRuns = runs.filter(r => r.job_id === job.id)
                     const runningCount = jobRuns.filter(r => r.status === 'Running').length
-                    const lastRun = jobRuns[0]
                     return (
                         <tr key={job.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <Box component="td" sx={{ p: 1.5, fontSize: '0.85rem', fontWeight: 600 }}>{job.name}</Box>

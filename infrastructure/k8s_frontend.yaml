@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: run-crab-run
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ns5042800
+      containers:
+        - name: frontend
+          image: registry.no3rd.com/run-crab-run-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+      imagePullSecrets:
+        - name: private-registry
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: run-crab-run
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: frontend
