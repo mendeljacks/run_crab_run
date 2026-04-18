@@ -52,7 +52,7 @@ export const RunDetailPage = observer(() => {
                 <DetailCard label="Finished" value={run.finished_at ? formatDatetime(run.finished_at) : '—'} />
             </Box>
 
-            {run.terminal_output && (
+            {run.terminal_output && run.terminal_output !== '__RUNNING__' && (
                 <Box sx={{ mt: 3 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Terminal Output</Typography>
                     <Paper sx={{ p: 2, borderRadius: 2, border: '1px solid #e2e8f0', bgcolor: '#0f172a', maxHeight: 400, overflow: 'auto' }}>

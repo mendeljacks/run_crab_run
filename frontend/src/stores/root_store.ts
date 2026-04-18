@@ -1,16 +1,8 @@
 import { observable, toJS } from 'mobx'
+import { auth_store } from '../pages/login/store'
 import { jobs_store } from '../pages/jobs/store'
 import { runs_store } from '../pages/runs/store'
 import { ui_store } from '../pages/ui/store'
-
-// Auth is managed via Supabase — we just keep a token reference here
-// for the MobX observability layer
-const auth_store = {
-    token: '' as string,
-    loading: false as boolean
-}
-
-export type AuthStore = typeof auth_store
 
 export const store = observable({
     auth: auth_store,

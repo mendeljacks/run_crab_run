@@ -62,3 +62,9 @@ backend/.env.local
 # Infrastructure
 infrastructure/node_modules/
 infrastructure/.env
+
+# Runner
+runner/node_modules/
+runner/dist/
+runner/.env
+runner/.env.local

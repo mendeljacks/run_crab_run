@@ -1,15 +1,18 @@
 import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
-import { Box, Typography, Paper, CircularProgress, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Switch, FormControlLabel, IconButton, Alert } from '@mui/material'
+import { Box, Typography, Paper, CircularProgress, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Switch, FormControlLabel, IconButton, Alert, Tooltip } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import ListAltIcon from '@mui/icons-material/ListAlt'
 import { runInAction } from 'mobx'
 import { store } from '../../stores/root_store'
-import { fetchJobs, createJob, triggerRun } from './helpers'
+import { fetchJobs, createJob, updateJob, deleteJob, triggerRun } from './helpers'
 import { fetchRuns } from '../runs/helpers'
 import { formatSchedule } from '../../helpers/format'
-import type { Job, Run } from '../../stores/types'
+import type { Job } from '../../stores/types'
 
 export const JobsPage = observer(() => {
     useEffect(() => {
@@ -56,11 +59,15 @@ export const JobsPage = observer(() => {
             )}
 
             <CreateJobDialog />
+
+            <EditJobDialog />
+
+            <DeleteJobConfirmDialog />
         </Box>
     )
 })
 
-const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: Run[] }) => {
+const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: { id: string; job_id: string; status: string }[] }) => {
     return (
         <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
             <Box component="thead" sx={{ bgcolor: '#f8fafc' }}>
@@ -91,9 +98,44 @@ const JobsTable = observer(({ jobs, runs }: { jobs: Job[]; runs: Run[] }) => {
                                 {jobRuns.length > 0 ? <span>{jobRuns.length} total</span> : '—'}
                             </Box>
                             <Box component="td" sx={{ p: 1.5 }}>
-                                <Button variant="outlined" size="small" startIcon={<PlayArrowIcon fontSize="small" />} onClick={async () => { await triggerRun(job.id); fetchRuns() }} sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}>
-                                    Run
-                                </Button>
+                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                    <Tooltip title="Run now">
+                                        <IconButton size="small" color="primary" onClick={async () => { await triggerRun(job.id); fetchRuns() }}>
+                                            <PlayArrowIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="View runs">
+                                        <IconButton size="small" onClick={() => {
+                                            runInAction(() => {
+                                                store.ui.runsSearch = job.name
+                                                store.ui.page = 'runs'
+                                            })
+                                            fetchRuns()
+                                        }}>
+                                            <ListAltIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                        <IconButton size="small" onClick={() => {
+                                            runInAction(() => {
+                                                store.ui.editingJob = job
+                                                store.ui.editJobOpen = true
+                                            })
+                                        }}>
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                        <IconButton size="small" color="error" onClick={() => {
+                                            runInAction(() => {
+                                                store.ui.deletingJobId = job.id
+                                                store.ui.deleteJobOpen = true
+                                            })
+                                        }}>
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
                             </Box>
                         </tr>
                     )
@@ -143,6 +185,93 @@ const CreateJobDialog = observer(() => {
                 <Button onClick={handleClose} sx={{ textTransform: 'none' }}>Cancel</Button>
                 <Button variant="contained" onClick={handleSubmit} disabled={!name || !command || submitting} sx={{ textTransform: 'none', borderRadius: 2 }}>
                     Create
+                </Button>
+            </DialogActions>
+        </Dialog>
+    )
+})
+
+const EditJobDialog = observer(() => {
+    const job = store.ui.editingJob as Job | null
+    const [name, setName] = useState('')
+    const [command, setCommand] = useState('')
+    const [schedule, setSchedule] = useState('')
+    const [enabled, setEnabled] = useState(true)
+
+    // Sync form when editingJob changes
+    useEffect(() => {
+        if (job) {
+            setName(job.name)
+            setCommand(job.command)
+            setSchedule(job.schedule ?? '')
+            setEnabled(job.enabled)
+        }
+    }, [job])
+
+    const open = store.ui.editJobOpen
+
+    const handleSubmit = async () => {
+        if (!job) return
+        const updates: { name?: string; command?: string; schedule?: string | null; enabled?: boolean } = {}
+        if (name !== job.name) updates.name = name
+        if (command !== job.command) updates.command = command
+        if (schedule !== (job.schedule ?? '')) updates.schedule = schedule || null
+        if (enabled !== job.enabled) updates.enabled = enabled
+
+        runInAction(() => { store.ui.editJobOpen = false })
+        if (Object.keys(updates).length > 0) {
+            await updateJob(job.id, updates)
+        }
+    }
+
+    const handleClose = () => {
+        runInAction(() => { store.ui.editJobOpen = false })
+    }
+
+    return (
+        <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+            <DialogTitle sx={{ fontWeight: 600 }}>Edit Job</DialogTitle>
+            <DialogContent sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
+                <TextField label="Name" value={name} onChange={e => setName(e.target.value)} size="small" fullWidth />
+                <TextField label="Command" value={command} onChange={e => setCommand(e.target.value)} size="small" fullWidth />
+                <TextField label="Schedule (RRULE)" value={schedule} onChange={e => setSchedule(e.target.value)} size="small" fullWidth placeholder="Leave empty for manual-only" helperText="Clear to remove schedule" />
+                <FormControlLabel control={<Switch checked={enabled} onChange={e => setEnabled(e.target.checked)} />} label="Enabled" />
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+                <Button onClick={handleClose} sx={{ textTransform: 'none' }}>Cancel</Button>
+                <Button variant="contained" onClick={handleSubmit} disabled={!name || !command} sx={{ textTransform: 'none', borderRadius: 2 }}>
+                    Save
+                </Button>
+            </DialogActions>
+        </Dialog>
+    )
+})
+
+const DeleteJobConfirmDialog = observer(() => {
+    const open = store.ui.deleteJobOpen
+    const jobId = store.ui.deletingJobId
+    const jobName = store.jobs.list.find(j => j.id === jobId)?.name ?? ''
+
+    const handleDelete = async () => {
+        if (!jobId) return
+        runInAction(() => { store.ui.deleteJobOpen = false })
+        await deleteJob(jobId)
+    }
+
+    const handleClose = () => {
+        runInAction(() => { store.ui.deleteJobOpen = false })
+    }
+
+    return (
+        <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontWeight: 600 }}>Delete Job?</DialogTitle>
+            <DialogContent>
+                <Typography>Are you sure you want to delete <strong>{jobName}</strong>? All associated runs will also be deleted.</Typography>
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+                <Button onClick={handleClose} sx={{ textTransform: 'none' }}>Cancel</Button>
+                <Button variant="contained" color="error" onClick={handleDelete} sx={{ textTransform: 'none', borderRadius: 2 }}>
+                    Delete
                 </Button>
             </DialogActions>
         </Dialog>

@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite'
 import { useEffect } from 'react'
-import { Box, Typography, Paper, CircularProgress, Chip, IconButton, Select, MenuItem, FormControl, InputLabel, TextField, InputAdornment } from '@mui/material'
+import { Box, Typography, Paper, CircularProgress, Chip, IconButton, Select, MenuItem, FormControl, InputLabel, TextField, InputAdornment, Alert } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import { runInAction } from 'mobx'
@@ -9,11 +9,10 @@ import { fetchRuns } from '../runs/helpers'
 import { fetchJobs } from '../jobs/helpers'
 import { shortId, formatTimeAgo, statusColor, statusBgColor } from '../../helpers/format'
 import type { Run } from '../../stores/types'
-import { useState } from 'react'
 
 export const RunsPage = observer(() => {
-    const [statusFilter, setStatusFilter] = useState<string>('')
-    const [search, setSearch] = useState('')
+    const statusFilter = store.ui.runsStatusFilter
+    const search = store.ui.runsSearch
 
     useEffect(() => {
         fetchRuns()
@@ -52,12 +51,14 @@ export const RunsPage = observer(() => {
                 </IconButton>
             </Box>
 
+            {store.runs.error && <Alert severity="error" sx={{ mb: 2 }}>{store.runs.error}</Alert>}
+
             <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <TextField
                     size="small"
                     placeholder="Search by job name or ID…"
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => runInAction(() => { store.ui.runsSearch = e.target.value })}
                     slotProps={{
                         input: {
                             startAdornment: (
@@ -65,14 +66,14 @@ export const RunsPage = observer(() => {
                             )
                         }
                     }}
-                    sx={{ minWidth: 260 }}
+                    sx={{ flex: 1, minWidth: 300 }}
                 />
                 <FormControl size="small" sx={{ minWidth: 140 }}>
                     <InputLabel>Status</InputLabel>
                     <Select
                         label="Status"
                         value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
+                        onChange={e => runInAction(() => { store.ui.runsStatusFilter = e.target.value })}
                     >
                         <MenuItem value="">All</MenuItem>
                         <MenuItem value="Running">Running</MenuItem>

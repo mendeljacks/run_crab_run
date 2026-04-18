@@ -52,7 +52,22 @@ npm run dev
 
 Verify: `curl http://localhost:4000/health` → `{"status":"ok"}`
 
-## 4. Start Frontend
+## 4. Start the Runner
+
+The runner watches for pending runs and executes job commands:
+
+```bash
+cd runner
+npm install
+npm run dev
+# → [runner] Polling every 2s
+```
+
+When you click "Run" on a job in the UI, it creates a run with `status='Running'`.
+The runner picks it up, executes the command, and updates the run with
+`status='Succeeded'`/`'Failed'`, `terminal_output`, and `finished_at`.
+
+## 5. Start Frontend
 
 The frontend `.env.development` is already configured for local Supabase:
 
@@ -66,7 +81,7 @@ npm run dev
 The Vite dev server proxies `/api` requests to `http://localhost:4000` (the backend).
 The Supabase client connects directly to `http://127.0.0.1:54321` (local Supabase auth).
 
-## 5. Use the App
+## 6. Use the App
 
 1. Open http://localhost:5173
 2. Click **"Sign In Anonymously"** — Supabase creates an anonymous session
@@ -103,10 +118,12 @@ npx supabase db reset      # Re-runs all migrations
 │ postgres.js → DB      │    │ :54321                   │
 │ jose JWKS → Auth      │    │ Signs JWTs (ES256)       │
 └──────────┬───────────┘    └──────────────────────────┘
+           │
            ▼
-┌──────────────────────┐
-│ Postgres (:54322)     │
-│ jobs + runs tables    │
-│ RLS enabled           │
-└──────────────────────┘
+┌──────────────────────┐     ┌──────────────────────────┐
+│ Postgres (:54322)     │     │ Runner (headless)         │
+│ jobs + runs tables    │◄────│ Polls for pending runs    │
+│ RLS enabled           │     │ Executes commands          │
+└──────────────────────┘     │ Updates status + output    │
+                              └──────────────────────────┘
 ```
