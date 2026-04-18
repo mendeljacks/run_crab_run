@@ -1,0 +1,1 @@
+cargo run --release --manifest-path backend/spacetimedb/Cargo.toml -p spacetimedb-standalone --  start --data-dir backend/generated --listen-addr 127.0.0.1:4000 --pg-port 4400 --jwt-key-dir backend/generated/jwt_key_dir
